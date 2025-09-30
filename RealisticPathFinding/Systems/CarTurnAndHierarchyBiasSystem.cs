@@ -73,7 +73,7 @@ namespace RealisticPathFinding.Systems
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
             // Run infrequently; we compute deltas so repeated runs won’t accumulate
-            return 262144/512; // once per in-game day
+            return 262144/32; // once per in-game day
         }
 
         // Update pipeline: jobs compute desired values -> main thread applies deltas to the graph

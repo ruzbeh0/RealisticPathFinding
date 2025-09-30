@@ -257,6 +257,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             ComfortMeters = comfort,
             RampMeters = ramp,
             MinSpeedMult = minMult,
+            t2w_timefactor = Time2WorkInterop.GetFactor(),
             m_PathfindQueue = this.m_PathfindSetupSystem.GetQueue((object)this, 64 /*0x40*/).AsParallelWriter(),
             m_BoardingQueue = this.m_Actions.m_BoardingQueue.AsParallelWriter(),
             m_ActionQueue = this.m_Actions.m_ActionQueue.AsParallelWriter(),
@@ -710,6 +711,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         public NativeArray<int> m_DeletedResidents;
         [ReadOnly] public ComponentLookup<Game.Routes.WaitingPassengers> m_WaitingPassengers;
         [ReadOnly] public ComponentLookup<Game.Prefabs.PublicTransportVehicleData> m_PublicTransportVehicleData;
+        [ReadOnly] public float t2w_timefactor;
         public NativeQueue<SetupQueueItem>.ParallelWriter m_PathfindQueue;
         public NativeQueue<ResidentAISystem.Boarding>.ParallelWriter m_BoardingQueue;
         public NativeQueue<ResidentAISystem.ResidentAction>.ParallelWriter m_ActionQueue;
@@ -2353,7 +2355,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                 m_BoardingQueue = this.m_BoardingQueue
             };
 
-            RPFRouteUtils.StripTransportSegments<RPFResidentAISystem.ResidentTickJob.TransportEstimateBuffer>(ref random, length, pathElement1, this.m_RouteConnectedData, this.m_BoardingVehicleData, this.m_OwnerData, this.m_LaneData, this.m_ConnectionLaneData, this.m_CurveData, this.m_PrefabRefData, this.m_PrefabTransportStopData, this.m_SubLanes, this.m_AreaNodes, this.m_AreaTriangles, this.m_WaitingPassengers, this.m_CurrentRouteData, this.m_PublicTransportVehicleData, kCrowd, scheduled_factor, transfer_penalty, transportEstimateBuffer);
+            RPFRouteUtils.StripTransportSegments<RPFResidentAISystem.ResidentTickJob.TransportEstimateBuffer>(ref random, length, pathElement1, this.m_RouteConnectedData, this.m_BoardingVehicleData, this.m_OwnerData, this.m_LaneData, this.m_ConnectionLaneData, this.m_CurveData, this.m_PrefabRefData, this.m_PrefabTransportStopData, this.m_SubLanes, this.m_AreaNodes, this.m_AreaTriangles, this.m_WaitingPassengers, this.m_CurrentRouteData, this.m_PublicTransportVehicleData, kCrowd, scheduled_factor, transfer_penalty, t2w_timefactor, transportEstimateBuffer);
             if (!this.m_OwnerData.HasComponent(currentLane.m_Lane))
                 return false;
             Entity owner = this.m_OwnerData[currentLane.m_Lane].m_Owner;
@@ -3817,7 +3819,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             // 4) Apply the long-walk multiplier to pedestrian speed
             float mult = LongWalkSpeedMultiplier(odMeters, ComfortMeters, RampMeters, MinSpeedMult);
             float baseWalk = parameters.m_WalkSpeed.x;
-            float newWalk = baseWalk * mult;
+            float newWalk = baseWalk * mult * 0.2f;
             parameters.m_WalkSpeed = new float2(newWalk, newWalk);
             // ISSUE: reference to a compiler-generated field
             if (this.m_CitizenData.HasComponent(resident.m_Citizen))

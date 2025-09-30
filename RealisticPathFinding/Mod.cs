@@ -39,12 +39,23 @@ namespace RealisticPathFinding
 
             AssetDatabase.global.LoadSettings(nameof(RealisticPathFinding), m_Setting, new Setting(this));
 
+            foreach (var modInfo in GameManager.instance.modManager)
+            {
+                if (modInfo.asset.name.Equals("Time2Work"))
+                {
+                    Mod.log.Info($"Loaded Realistic Trips Mod with time factor: {Time2WorkInterop.GetFactor()}");
+                }
+            }
+
             // Disable original systems
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem>().Enabled = false;
 
             updateSystem.UpdateAt<RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.WalkSpeedUpdaterSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarTurnAndHierarchyBiasSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianDensityPenaltySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.CarCongestionEwmaSystem>(SystemUpdatePhase.GameSimulation);
 
             //Harmony
             var harmony = new Harmony(harmonyID);

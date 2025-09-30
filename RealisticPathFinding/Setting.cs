@@ -10,8 +10,8 @@ using System.Collections.Generic;
 namespace RealisticPathFinding
 {
     [FileLocation("ModsSettings\\" + nameof(RealisticPathFinding) + "\\" + nameof(RealisticPathFinding))]
-    [SettingsUIGroupOrder(TurnPenaltyGroup, RoadBiasGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
-    [SettingsUIShowGroupName(TurnPenaltyGroup, RoadBiasGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
+    [SettingsUIGroupOrder(TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
+    [SettingsUIShowGroupName(TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
     public class Setting : ModSetting
     {
         public const string PedestriansSection = "Pedestrians";
@@ -23,6 +23,7 @@ namespace RealisticPathFinding
         public const string LongDistanceGroup = "LongDistanceGroup";
         public const string TurnPenaltyGroup = "TurnPenalty";
         public const string RoadBiasGroup = "RoadBias";
+        public const string CongestionGroup = "Congestion";
 
         public Setting(IMod mod) : base(mod)
         {
@@ -35,18 +36,18 @@ namespace RealisticPathFinding
         }
         public void SetParameters()
         {
-            base_turn_penalty = 3f;
-            min_turn_agle_deg = 20f;
+            base_turn_penalty = 2f;
+            min_turn_agle_deg = 45f;
             max_turn_agle_deg = 100f;
             uturn_threshold_deg = 150f;
             collector_bias = 0.05f;
             local_bias = 0.1f;
             alleyway_bias = 0.15f;
-            uturn_sec_penalty = 5f;
+            uturn_sec_penalty = 4f;
             transfer_penalty = 1.5f;
             scheduled_wt_factor = 0.5f;
             crowdness_factor = 0.15f;
-            bus_mode_weight = 1.05f;
+            bus_mode_weight = 1.00f;
             tram_mode_weight = 0.95f;
             subway_mode_weight = 0.9f;
             train_mode_weight = 0.9f;
@@ -55,9 +56,10 @@ namespace RealisticPathFinding
             average_walk_speed_adult = 3.1f;
             average_walk_speed_elderly = 2.6f;
             crowdness_factor = 0.2f;
-            walk_long_comfort_m = 500f;
+            walk_long_comfort_m = 600f;
             walk_long_ramp_m = 700f;
-            walk_long_min_mult = 0.6f;
+            walk_long_min_mult = 0.3f;
+            ped_walk_time_factor = 50.0f;
         }
 
         [SettingsUISlider(min = 0, max = 180, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
@@ -136,6 +138,10 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         public float average_walk_speed_elderly { get; set; }
 
+        [SettingsUISlider(min = 1f, max = 100f, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISection(PedestriansSection, PedestrianGroup)]
+        public float ped_walk_time_factor { get; set; }
+
         [SettingsUISlider(min = 500f, max = 1000f, step = 50f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(PedestriansSection, LongDistanceGroup)]
         public float walk_long_comfort_m { get; set; }
@@ -147,6 +153,32 @@ namespace RealisticPathFinding
         [SettingsUISlider(min = 0, max = 1f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(PedestriansSection, LongDistanceGroup)]
         public float walk_long_min_mult { get; set; }
+
+        [SettingsUISlider(min = 0.05f, max = 0.5f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(VehicleSection, CongestionGroup)]
+        public float cong_alpha { get; set; } = 0.20f;
+
+        [SettingsUISlider(min = 0f, max = 2f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISection(VehicleSection, CongestionGroup)]
+        public float cong_min_push_sec { get; set; } = 0.5f;  // UpdateThresholdSec
+
+        [SettingsUISlider(min = 1f, max = 5f, step = 0.25f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(VehicleSection, CongestionGroup)]
+        public float cong_max_ratio { get; set; } = 3.0f;     // MaxSlowdownRatio
+
+        [SettingsUISlider(min = 0f, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(VehicleSection, CongestionGroup)]
+        public float cong_max_density { get; set; } = 0.50f;  // MaxDensityAdd
+
+        [SettingsUISlider(min = 0.5f, max = 5f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(VehicleSection, CongestionGroup)]
+        public float cong_min_ff_mps { get; set; } = 1.0f;    // MinFreeflowMps
+
+        [SettingsUISlider(min = 0f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(VehicleSection, CongestionGroup)]
+        public float cong_min_sample_sec { get; set; } = 0.2f; // MinSampleEmitSec
+
+
     }
 
     public class LocaleEN : IDictionarySource
@@ -286,6 +318,38 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.walk_long_min_mult)), "Minimum speed multiplier" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.walk_long_min_mult)),
               "Floor for perceived walking speed on long trips. Example: 0.6 = treat long ODs as if walking 40% slower." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.ped_walk_time_factor)),
+            "Walking cost multiplier" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.ped_walk_time_factor)),
+            "Multiplies the pedestrian walking cost. 1.0 = no change; higher values make walking less attractive overall." },
+
+            // Group under Vehicles
+            { m_Setting.GetOptionGroupLocaleID(Setting.CongestionGroup), "Congestion feedback" },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.cong_alpha)), "Smoothing (alpha)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.cong_alpha)),
+              "Exponential smoothing for live travel times. Higher = reacts faster; lower = steadier." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.cong_min_push_sec)), "Update threshold (s)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.cong_min_push_sec)),
+              "Only update routing costs if the smoothed travel time changes by at least this many seconds." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.cong_max_ratio)), "Max slowdown (× freeflow)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.cong_max_ratio)),
+              "Cap for the measured/freeflow time ratio (e.g., 3.0 = at most three times slower than freeflow)." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.cong_max_density)), "Max density add" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.cong_max_density)),
+              "Upper limit on the extra density applied to congested lanes (0–1). Larger values slow cars more." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.cong_min_ff_mps)), "Min freeflow speed (m/s)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.cong_min_ff_mps)),
+              "Floor used when estimating baseline freeflow from lane length and speed limit; avoids extreme ratios." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.cong_min_sample_sec)), "Min sample duration (s)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.cong_min_sample_sec)),
+              "Ignore very short lane traversals under this duration when building the live average." },
         };
 
             return dict;

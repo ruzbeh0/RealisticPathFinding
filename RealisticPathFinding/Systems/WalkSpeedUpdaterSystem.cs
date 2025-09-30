@@ -68,7 +68,7 @@ namespace RealisticPathFinding.Systems
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
             // One day (or month) in-game is '262144' ticks
-            return 262144 / 512;
+            return 262144 / 4;
         }
 
         private float SelectSpeedByAge(AgeMask mask)

@@ -19,7 +19,7 @@ namespace RealisticPathFinding.Utils
 {
     public static class RPFRouteUtils
     {
-        public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
+        public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, float t2w_timefactor, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
         {
             int num = 0;
             Entity lastBoardedRoute = Entity.Null;
@@ -111,7 +111,7 @@ namespace RealisticPathFinding.Utils
                     float crowdingFactor = 1f;
                     if (capacity > 0)
                     {
-                        if(wp.m_Count > (float)capacity/2)
+                        if(wp.m_Count > (float)capacity*0.7f)
                         {
                             // signal ~ 0 when few waiting; ~1 when roughly one vehicle-load of people wait
                             float signal = math.saturate(wp.m_Count / (float)capacity);
@@ -130,7 +130,9 @@ namespace RealisticPathFinding.Utils
 
                 if (seconds > 0)
                 {
-                    if(componentData.m_TransportType == TransportType.Train || componentData.m_TransportType == TransportType.Ship || componentData.m_TransportType == TransportType.Airplane)
+                    //If realistic trips exists, adjust for its time factor
+                    seconds = (int)((float)seconds/t2w_timefactor);
+                    if (componentData.m_TransportType == TransportType.Train || componentData.m_TransportType == TransportType.Ship || componentData.m_TransportType == TransportType.Airplane)
                     {
                         // Boarding time is halved for trains, ships and airplanes since it is assumed that those modes run less frequently and with a set schedule that is known to the passenger
                         seconds = (int)((float)seconds*schedule_factor);
