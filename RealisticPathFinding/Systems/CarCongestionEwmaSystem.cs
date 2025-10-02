@@ -47,6 +47,7 @@ namespace RealisticPathFinding.Systems
         ComponentLookup<Curve> _curveLk;
         ComponentLookup<PrefabRef> _prefabLk;
         ComponentLookup<RoadData> _roadDataLk;
+        public float CarModeWeight; // from settings
 
         // Samples produced by the Burst job (this frame)
         NativeQueue<Sample> _sampleQueue;
@@ -140,6 +141,9 @@ namespace RealisticPathFinding.Systems
                 }
             }
 
+            CarModeWeight = Mod.m_Setting?.car_mode_weight ?? 1f;
+
+
             // 2) Burst job: accumulate time per vehicle and emit a sample on lane change
             var job = new SampleJob
             {
@@ -207,14 +211,23 @@ namespace RealisticPathFinding.Systems
                 if (has) EntityManager.SetComponentData(lane, t);
                 else EntityManager.AddComponentData(lane, t);
 
-                // Convert slowdown into density add (cap both ratio & density)
-                float ratio = math.saturate(ewma / math.max(0.01f, t.FreeflowSec));
-                ratio = math.min(ratio, cfg.MaxSlowdownRatio);
+                // Convert slowdown into density, with mode bias applied
+                // Base ratio from EWMA vs freeflow:
+                float ratio = ewma / math.max(0.01f, t.FreeflowSec);
 
-                // Simple mapping: densityAdd = clamp(ratio - 1, 0, MaxDensityAdd)
-                float densityAdd = math.min(math.max(0f, ratio - 1f), cfg.MaxDensityAdd);
+                // Add global mode bias: (car_mode_weight - 1)
+                //  < 0: prefer cars  (lower cost)
+                //  > 0: penalize cars (higher cost)
+                ratio += (CarModeWeight - 1f);
 
-                // Push delta into graph
+                // Clamp final ratio
+                ratio = math.clamp(ratio, 0f, cfg.MaxSlowdownRatio);
+
+                // Map to density add:
+                // allow negative when car_mode_weight < 1 so we can reduce road cost
+                float densityAdd = math.clamp(ratio - 1f, -cfg.MaxSlowdownRatio, cfg.MaxDensityAdd);
+
+                // Push delta into graph (unchanged logic)
                 if (TryGetEdge(data, lane, out var eid))
                 {
                     float prev = _lastDensityAdd.TryGetValue(lane, out var p) ? p : 0f;
@@ -226,6 +239,7 @@ namespace RealisticPathFinding.Systems
                         _lastDensityAdd[lane] = densityAdd;
                     }
                 }
+
             }
 
             pqs.AddDataReader(default);

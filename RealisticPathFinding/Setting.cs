@@ -10,8 +10,8 @@ using System.Collections.Generic;
 namespace RealisticPathFinding
 {
     [FileLocation("ModsSettings\\" + nameof(RealisticPathFinding) + "\\" + nameof(RealisticPathFinding))]
-    [SettingsUIGroupOrder(TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
-    [SettingsUIShowGroupName(TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
+    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
+    [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
     public class Setting : ModSetting
     {
         public const string PedestriansSection = "Pedestrians";
@@ -24,6 +24,7 @@ namespace RealisticPathFinding
         public const string TurnPenaltyGroup = "TurnPenalty";
         public const string RoadBiasGroup = "RoadBias";
         public const string CongestionGroup = "Congestion";
+        public const string CarModeWeightGroup = "CarModeWeightGroup";
 
         public Setting(IMod mod) : base(mod)
         {
@@ -36,6 +37,7 @@ namespace RealisticPathFinding
         }
         public void SetParameters()
         {
+            car_mode_weight = 0.90f;
             base_turn_penalty = 2f;
             min_turn_agle_deg = 45f;
             max_turn_agle_deg = 100f;
@@ -59,8 +61,13 @@ namespace RealisticPathFinding
             walk_long_comfort_m = 600f;
             walk_long_ramp_m = 700f;
             walk_long_min_mult = 0.3f;
-            ped_walk_time_factor = 50.0f;
+            ped_walk_time_factor = 10.0f;
         }
+
+        [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(VehicleSection, CarModeWeightGroup)]
+        public float car_mode_weight { get; set; }
+
 
         [SettingsUISlider(min = 0, max = 180, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
@@ -94,9 +101,17 @@ namespace RealisticPathFinding
         [SettingsUISection(VehicleSection, RoadBiasGroup)]
         public float alleyway_bias { get; set; }
 
+        [SettingsUISlider(min = 0, max = 1, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISection(TransitSection, WaitingTimeGroup)]
+        public float waiting_time_factor { get; set; } = 1.0f;
+
         [SettingsUISlider(min = 0, max = 3, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
         public float transfer_penalty { get; set; }
+
+        [SettingsUISlider(min = 0, max = 3, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISection(TransitSection, WaitingTimeGroup)]
+        public float feeder_trunk_transfer_penalty { get; set; } = 1.0f;
 
         [SettingsUISlider(min = 0, max = 1, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
@@ -138,7 +153,7 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         public float average_walk_speed_elderly { get; set; }
 
-        [SettingsUISlider(min = 1f, max = 100f, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 1f, max = 50f, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         public float ped_walk_time_factor { get; set; }
 
@@ -202,6 +217,7 @@ namespace RealisticPathFinding
             // NOTE: your constant is 'WaitingTine' (typo); label shows fine as "Waiting time".
             { m_Setting.GetOptionGroupLocaleID(Setting.WaitingTimeGroup), "Waiting time" },
             { m_Setting.GetOptionGroupLocaleID(Setting.ModeWeightGroup),  "Transport Type Weights" },
+            { m_Setting.GetOptionGroupLocaleID(Setting.CarModeWeightGroup),  "Vehicle Weight" },
             { m_Setting.GetOptionGroupLocaleID(Setting.PedestrianGroup),  "Walking Speeds" },
 
             // New section (tab)
@@ -214,9 +230,17 @@ namespace RealisticPathFinding
             // Group (under Pedestrians)
             { m_Setting.GetOptionGroupLocaleID(Setting.LongDistanceGroup), "Long-distance walking" },
 
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.car_mode_weight)), "Car perceived-time weight" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.car_mode_weight)), "Multiplier on in-vehicle car time used for route choice. 1.0 = neutral; < 1.0 makes driving feel faster, > 1.0 makes it feel slower." },
+
+
             // ============================
             // Transit → Waiting time group
             // ============================
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.waiting_time_factor)),
+              "Waiting time weight" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.waiting_time_factor)),
+              "Multiplier applied to the waiting time at the initial transit stop." },
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.transfer_penalty)),
               "Transfer penalty" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.transfer_penalty)),
@@ -254,6 +278,10 @@ namespace RealisticPathFinding
               "Train in-vehicle time weight" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.train_mode_weight)),
               "Multiplier applied to regional/commuter rail in-vehicle time." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Feeder→Trunk transfer penalty" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Multiplier applied to the wait time when transferring from a feeder mode (bus/tram) to a trunk mode (metro/train/ship/plane). Use 1.0 for no extra penalty; values < 1.0 reduce hassle, > 1.0 increase it." },
+
 
             // ============================
             // Pedestrians → Speeds group

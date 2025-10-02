@@ -8,6 +8,7 @@ using Game.Routes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Unity.Collections;
@@ -19,10 +20,21 @@ namespace RealisticPathFinding.Utils
 {
     public static class RPFRouteUtils
     {
-        public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, float t2w_timefactor, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
+        // Transit > Transfers
+        public static float feeder_transfer_mult { get; set; } = 0.8f;  // < 1 lowers penalty
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool IsFeeder(TransportType t) => t == TransportType.Bus || t == TransportType.Tram;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool IsTrunk(TransportType t) =>
+            t == TransportType.Subway || t == TransportType.Train || t == TransportType.Ship || t == TransportType.Airplane;
+
+        public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, float feeder_trunk_transfer_penalty, float t2w_timefactor, float waiting_weight, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
         {
             int num = 0;
             Entity lastBoardedRoute = Entity.Null;
+            TransportType lastTransportType = TransportType.None;
             while (num < length)
             {
                 PathElement pathElement = path[num++];
@@ -120,7 +132,7 @@ namespace RealisticPathFinding.Utils
                         } 
                     }
 
-                    seconds = (int)math.ceil(seconds * crowdingFactor);
+                    seconds = (int)math.ceil(seconds * crowdingFactor* waiting_weight);
 
                 }
 
@@ -131,7 +143,7 @@ namespace RealisticPathFinding.Utils
                 if (seconds > 0)
                 {
                     //If realistic trips exists, adjust for its time factor
-                    seconds = (int)((float)seconds/t2w_timefactor);
+                    //seconds = (int)((float)seconds/t2w_timefactor);
                     if (componentData.m_TransportType == TransportType.Train || componentData.m_TransportType == TransportType.Ship || componentData.m_TransportType == TransportType.Airplane)
                     {
                         // Boarding time is halved for trains, ships and airplanes since it is assumed that those modes run less frequently and with a set schedule that is known to the passenger
@@ -140,18 +152,54 @@ namespace RealisticPathFinding.Utils
 
                     // ----- APPLY TRANSFER PENALTY (wait only) -----
                     bool isTransfer = (lastBoardedRoute != Entity.Null) && (currentRoute != Entity.Null) && (currentRoute != lastBoardedRoute);
+
                     if (isTransfer)
-                        seconds = (int)math.ceil(seconds * transfer_penalty);
-
-                    transportEstimateBuffer.AddWaitEstimate(pathElement.m_Target, seconds);
+                    {
+                        if (IsFeeder(lastTransportType) && IsTrunk(componentData.m_TransportType))
+                        {
+                            seconds = (int)math.ceil(seconds * feeder_trunk_transfer_penalty);
+                        } else
+                        {
+                            seconds = (int)math.ceil(seconds * transfer_penalty);
+                        }    
+                    }
+                        
                     if (currentRoute != Entity.Null)
+                    {
                         lastBoardedRoute = currentRoute;   // first boarding sets the baseline route; later changes are transfers
-
+                        lastTransportType = componentData.m_TransportType;
+                    }
 
                     //Mod.log.Info($"Adding boarding time estimate of {seconds} seconds for transport type {componentData.m_TransportType}. IsTransfer:{isTransfer}");
                     transportEstimateBuffer.AddWaitEstimate(pathElement.m_Target, seconds);
                 }
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool TryGetRoadSpeedMps(Entity laneOrConn,
+    ref ComponentLookup<PrefabRef> prefabRefLk,
+    ref ComponentLookup<RoadData> roadDataLk,
+    out float speedMps)
+        {
+            speedMps = 0f;
+            if (!prefabRefLk.HasComponent(laneOrConn)) return false;
+            var prefab = prefabRefLk[laneOrConn].m_Prefab;
+            if (prefab == Entity.Null || !roadDataLk.HasComponent(prefab)) return false;
+
+            // RoadData.m_SpeedLimit is in m/s
+            var rd = roadDataLk[prefab];
+            speedMps = math.max(0.1f, rd.m_SpeedLimit); // guard tiny values
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static float CurveLength(Entity laneOrConn,
+            ref ComponentLookup<Curve> curveLk)
+        {
+            // lanes and connection lanes hold Curve
+            if (!curveLk.HasComponent(laneOrConn)) return 0f;
+            return math.max(0f, curveLk[laneOrConn].m_Length);
         }
 
         /// <summary>

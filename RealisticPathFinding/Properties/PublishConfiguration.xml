@@ -1,6 +1,6 @@
 ﻿<Publish>
 	<!--Id must be set in order to update existed mod. it is not required for publishing mod for the first time-->
-	<ModId Value="" />
+	<ModId Value="121226" />
 	<!--Name of the mod to display to players-->
 	<DisplayName Value="[BETA] Realistic PathFinding" />
 	<!--Short description of the mod-->
@@ -8,8 +8,6 @@
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="This is a long description" /-->
 	<LongDescription>
-##Realistic Pathfinding
-
 Make your citizens choose routes that feel closer to real life.
 
 **BETA**: This mod is in early development. Overrall it is working but some adjustments might still be needed. Please report any issues on the forum or on discord.
@@ -18,7 +16,7 @@ Make your citizens choose routes that feel closer to real life.
 
 When using this mod you should expect to have less transit trips and more walk and driving trips. The vanilla game makes transit more attractive than it should. For example, it does not consider waiting times and transfer times when deciding if transit should be used. Those are very important in a real world travel demand model. This mod adds those to PathFinding, which also means that number of vehicles in a route has a greater effect: more vehicles means less waiting time which makes a route more attractive. It also means that cims will prefer to walk over taking a bus for just a short distance.
 
-##Transit
+## Transit
 
 * Waiting times: add waiting transit waiting times when trying to decided if transit should be used, also adds a adjustment factor to give timetabled modes (rail/ship/air) a lower perceived wait.
 
@@ -28,13 +26,13 @@ When using this mod you should expect to have less transit trips and more walk a
 
 * Mode feel: set different “ride comfort” weights for bus, tram, subway, and train.
 
-##Walking
+## Walking
 
 * Age-based walking speeds (averaging ~3 mph across the population).
 
 * Long-distance aversion: very long all-walk trips become less attractive, short walks stay untouched.
 
-##Driving
+## Driving
 
 * Turn delays at intersections (with extra for sharp turns/U-turns).
 
@@ -42,9 +40,10 @@ When using this mod you should expect to have less transit trips and more walk a
 
 * Congestion avoidance: vehicles avoid roads with heavy traffic.
 
-##Tweakable
+## Tweakable
 Everything is configurable with simple in-game sliders—dial it toward realism or efficiency to fit your city.
 
+This mod is not compatible with Lazy Pedestrians
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/logo.jpg" />
@@ -57,17 +56,17 @@ Everything is configurable with simple in-game sliders—dial it toward realism 
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/realistic-pathfinding-mod.1861163/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.1" />
+	<ModVersion Value="0.3" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.3.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Required DLC, can be set multiple times. Supported values are "Landmark Buildings", "San Fransisco Set", "Beach Properties", "Urban Promenades", "Modern Architecture"-->
 	<RequiredDLC Value="" />
-	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="" />
-	<!--<ChangeLog>
-	</ChangeLog>-->
+	<ChangeLog>
+* Adjusted default walking cost
+* Added weight option to configure vehicle perceived travel time
+	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon-->
 	<ExternalLink Type="github" Url="https://github.com/ruzbeh0/RealisticPathFinding" />
 	<ExternalLink Type="discord" Url="https://discord.com/channels/1024242828114673724/1422653000597372989" />

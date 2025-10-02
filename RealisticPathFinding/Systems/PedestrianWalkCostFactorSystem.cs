@@ -64,7 +64,7 @@ namespace RealisticPathFinding.Systems
         {
             // Read your setting (fallback to 1.0 = no change)
             float factor = Mod.m_Setting?.ped_walk_time_factor ?? 1.0f;
-            factor = math.clamp(factor, 0.1f, 500f);
+            factor = math.clamp(factor, 0.1f, 50f);
             if (math.abs(factor - 1f) < 1e-4f && _prevFactorByLane.IsCreated && _prevFactorByLane.Count() == 0)
                 return; // nothing to do (first run and factor is 1)
 
@@ -90,15 +90,15 @@ namespace RealisticPathFinding.Systems
                     //walk.m_Value.x = orig.Walk.m_Value.x * factor;
 
                     // If you want to multiply ALL channels instead, replace the line above with:
-                    walk.m_Value *= factor;
+                    //walk.m_Value *= factor;
                     if(factor > 1f)
                     {
                         walk.m_Value.y = factor;
-                        walk.m_Value.x = factor;
+                        //walk.m_Value.x = factor;
                     }
 
                     data.m_WalkingCost = walk;
-                    data.m_SpawnCost.m_Value.x += factor;
+                    //data.m_SpawnCost.m_Value.x += factor;
 
                     EntityManager.SetComponentData(e, data);
                 }

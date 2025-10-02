@@ -63,6 +63,7 @@ public partial class RPFResidentAISystem : GameSystemBase
     [DebugWatchValue]
     private NativeArray<int> m_DeletedResidents;
     private RPFResidentAISystem.TypeHandle __TypeHandle;
+    private bool _weAllocatedQueues;
 
     [UnityEngine.Scripting.Preserve]
     protected override void OnCreate()
@@ -114,6 +115,11 @@ public partial class RPFResidentAISystem : GameSystemBase
     {
         // ISSUE: reference to a compiler-generated field
         this.m_DeletedResidents.Dispose();
+        if (_weAllocatedQueues)
+        {
+            if (m_Actions.m_BoardingQueue.IsCreated) m_Actions.m_BoardingQueue.Dispose();
+            if (m_Actions.m_ActionQueue.IsCreated) m_Actions.m_ActionQueue.Dispose();
+        }
         base.OnDestroy();
     }
 
@@ -123,8 +129,13 @@ public partial class RPFResidentAISystem : GameSystemBase
         uint index = this.m_SimulationSystem.frameIndex % 16U /*0x10*/;
         this.m_CreatureQuery.SetSharedComponentFilter<UpdateFrame>(new UpdateFrame(index));
         this.m_GroupCreatureQuery.SetSharedComponentFilter<UpdateFrame>(new UpdateFrame(index));
-        this.m_Actions.m_BoardingQueue = new NativeQueue<ResidentAISystem.Boarding>((AllocatorManager.AllocatorHandle)Allocator.TempJob);
-        this.m_Actions.m_ActionQueue = new NativeQueue<ResidentAISystem.ResidentAction>((AllocatorManager.AllocatorHandle)Allocator.TempJob);
+        if (!m_Actions.m_BoardingQueue.IsCreated || !m_Actions.m_ActionQueue.IsCreated)
+        {
+            m_Actions.m_BoardingQueue = new NativeQueue<ResidentAISystem.Boarding>(Allocator.Persistent);
+            m_Actions.m_ActionQueue   = new NativeQueue<ResidentAISystem.ResidentAction>(Allocator.Persistent);
+            _weAllocatedQueues = true;
+        }
+
         JobHandle jobHandle1;
         this.m_PersonalCarSelectData.PreUpdate((SystemBase)this, this.m_CityConfigurationSystem, this.m_CarPrefabQuery, Allocator.TempJob, out jobHandle1);
 
@@ -254,10 +265,12 @@ public partial class RPFResidentAISystem : GameSystemBase
             kCrowd = Mod.m_Setting.crowdness_factor,
             scheduled_factor = Mod.m_Setting.scheduled_wt_factor,
             transfer_penalty = Mod.m_Setting.transfer_penalty,
+            feeder_trunk_transfer_penalty = Mod.m_Setting.feeder_trunk_transfer_penalty,
             ComfortMeters = comfort,
             RampMeters = ramp,
             MinSpeedMult = minMult,
             t2w_timefactor = Time2WorkInterop.GetFactor(),
+            waiting_weight = Mod.m_Setting.waiting_time_factor,
             m_PathfindQueue = this.m_PathfindSetupSystem.GetQueue((object)this, 64 /*0x40*/).AsParallelWriter(),
             m_BoardingQueue = this.m_Actions.m_BoardingQueue.AsParallelWriter(),
             m_ActionQueue = this.m_Actions.m_ActionQueue.AsParallelWriter(),
@@ -712,6 +725,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly] public ComponentLookup<Game.Routes.WaitingPassengers> m_WaitingPassengers;
         [ReadOnly] public ComponentLookup<Game.Prefabs.PublicTransportVehicleData> m_PublicTransportVehicleData;
         [ReadOnly] public float t2w_timefactor;
+        [ReadOnly] public float waiting_weight;
         public NativeQueue<SetupQueueItem>.ParallelWriter m_PathfindQueue;
         public NativeQueue<ResidentAISystem.Boarding>.ParallelWriter m_BoardingQueue;
         public NativeQueue<ResidentAISystem.ResidentAction>.ParallelWriter m_ActionQueue;
@@ -719,6 +733,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         public float kCrowd;
         public float scheduled_factor;
         public float transfer_penalty;
+        public float feeder_trunk_transfer_penalty;
         public float ComfortMeters;
         public float RampMeters;
         public float MinSpeedMult;
@@ -2355,7 +2370,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                 m_BoardingQueue = this.m_BoardingQueue
             };
 
-            RPFRouteUtils.StripTransportSegments<RPFResidentAISystem.ResidentTickJob.TransportEstimateBuffer>(ref random, length, pathElement1, this.m_RouteConnectedData, this.m_BoardingVehicleData, this.m_OwnerData, this.m_LaneData, this.m_ConnectionLaneData, this.m_CurveData, this.m_PrefabRefData, this.m_PrefabTransportStopData, this.m_SubLanes, this.m_AreaNodes, this.m_AreaTriangles, this.m_WaitingPassengers, this.m_CurrentRouteData, this.m_PublicTransportVehicleData, kCrowd, scheduled_factor, transfer_penalty, t2w_timefactor, transportEstimateBuffer);
+            RPFRouteUtils.StripTransportSegments<RPFResidentAISystem.ResidentTickJob.TransportEstimateBuffer>(ref random, length, pathElement1, this.m_RouteConnectedData, this.m_BoardingVehicleData, this.m_OwnerData, this.m_LaneData, this.m_ConnectionLaneData, this.m_CurveData, this.m_PrefabRefData, this.m_PrefabTransportStopData, this.m_SubLanes, this.m_AreaNodes, this.m_AreaTriangles, this.m_WaitingPassengers, this.m_CurrentRouteData, this.m_PublicTransportVehicleData, kCrowd, scheduled_factor, transfer_penalty, feeder_trunk_transfer_penalty, t2w_timefactor, waiting_weight, transportEstimateBuffer);
             if (!this.m_OwnerData.HasComponent(currentLane.m_Lane))
                 return false;
             Entity owner = this.m_OwnerData[currentLane.m_Lane].m_Owner;
@@ -3819,7 +3834,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             // 4) Apply the long-walk multiplier to pedestrian speed
             float mult = LongWalkSpeedMultiplier(odMeters, ComfortMeters, RampMeters, MinSpeedMult);
             float baseWalk = parameters.m_WalkSpeed.x;
-            float newWalk = baseWalk * mult * 0.2f;
+            float newWalk = baseWalk * mult;
             parameters.m_WalkSpeed = new float2(newWalk, newWalk);
             // ISSUE: reference to a compiler-generated field
             if (this.m_CitizenData.HasComponent(resident.m_Citizen))

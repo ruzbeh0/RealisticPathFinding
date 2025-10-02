@@ -8,6 +8,7 @@ using HarmonyLib;
 using RealisticPathFinding.Systems;
 using System.IO;
 using System.Linq;
+using Unity.Collections;
 using Unity.Entities;
 
 namespace RealisticPathFinding
@@ -50,11 +51,14 @@ namespace RealisticPathFinding
             // Disable original systems
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem>().Enabled = false;
 
+            updateSystem.UpdateAfter<RealisticPathFinding.Systems.ScaleWaitingTimesSystem, Game.Simulation.WaitingPassengersSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
+            //updateSystem.UpdateAfter<Game.Simulation.ResidentAISystem.Actions,RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
+            //updateSystem.UpdateAfter<RealisticPathFinding.Systems.RPFResidentAISystem, Game.Simulation.ResidentAISystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.WalkSpeedUpdaterSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarTurnAndHierarchyBiasSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianDensityPenaltySystem>(SystemUpdatePhase.GameSimulation);
+            //updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianDensityPenaltySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarCongestionEwmaSystem>(SystemUpdatePhase.GameSimulation);
 
             //Harmony

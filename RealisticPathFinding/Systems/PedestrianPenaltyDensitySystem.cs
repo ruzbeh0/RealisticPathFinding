@@ -36,7 +36,7 @@ namespace RealisticPathFinding.Systems
         protected override void OnUpdate()
         {
             // Slider in your settings, e.g. 0.00 – 0.30; start with 0.05–0.10
-            float pedDensityAdd = math.saturate(Mod.m_Setting?.ped_walk_time_factor*10 ?? 0.08f);
+            float pedDensityAdd = math.saturate(Mod.m_Setting?.ped_walk_time_factor ?? 0.08f);
 
             var pqs = World.GetOrCreateSystemManaged<PathfindQueueSystem>();
             var data = pqs.GetDataContainer(out var dep); dep.Complete();
