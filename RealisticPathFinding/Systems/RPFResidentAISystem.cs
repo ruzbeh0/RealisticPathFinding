@@ -787,7 +787,16 @@ public partial class RPFResidentAISystem : GameSystemBase
                         Divert divert;
                         CollectionUtils.TryGet<Divert>(nativeArray9, index, out divert);
                         // ISSUE: reference to a compiler-generated field
-                        PathOwner pathOwner = this.m_PathOwnerData[entity];
+                        bool hasPathOwner = this.m_PathOwnerData.HasComponent(entity);
+                        PathOwner pathOwner = default;
+                        if (hasPathOwner)
+                            pathOwner = this.m_PathOwnerData[entity];
+                        else
+                        {
+                            // Give the resident a default PathOwner so downstream code works
+                            // Use the jobIndex overload of ECB since you’re inside a parallel job
+                            this.m_CommandBuffer.AddComponent<PathOwner>(unfilteredChunkIndex, entity, default);
+                        }
                         // ISSUE: reference to a compiler-generated field
                         ref Human local = ref this.m_HumanData.GetRefRW(entity).ValueRW;
                         // ISSUE: reference to a compiler-generated method
@@ -821,7 +830,16 @@ public partial class RPFResidentAISystem : GameSystemBase
                         Divert divert;
                         CollectionUtils.TryGet<Divert>(nativeArray9, index, out divert);
                         // ISSUE: reference to a compiler-generated field
-                        PathOwner pathOwner = this.m_PathOwnerData[entity];
+                        bool hasPathOwner = this.m_PathOwnerData.HasComponent(entity);
+                        PathOwner pathOwner = default;
+                        if (hasPathOwner)
+                            pathOwner = this.m_PathOwnerData[entity];
+                        else
+                        {
+                            // Give the resident a default PathOwner so downstream code works
+                            // Use the jobIndex overload of ECB since you’re inside a parallel job
+                            this.m_CommandBuffer.AddComponent<PathOwner>(unfilteredChunkIndex, entity, default);
+                        }
                         // ISSUE: reference to a compiler-generated field
                         ref Human local = ref this.m_HumanData.GetRefRW(entity).ValueRW;
                         // ISSUE: reference to a compiler-generated field
@@ -866,7 +884,16 @@ public partial class RPFResidentAISystem : GameSystemBase
                         DynamicBuffer<GroupCreature> groupCreatures;
                         CollectionUtils.TryGet<GroupCreature>(bufferAccessor, index, out groupCreatures);
                         // ISSUE: reference to a compiler-generated field
-                        PathOwner pathOwner = this.m_PathOwnerData[entity];
+                        bool hasPathOwner = this.m_PathOwnerData.HasComponent(entity);
+                        PathOwner pathOwner = default;
+                        if (hasPathOwner)
+                            pathOwner = this.m_PathOwnerData[entity];
+                        else
+                        {
+                            // Give the resident a default PathOwner so downstream code works
+                            // Use the jobIndex overload of ECB since you’re inside a parallel job
+                            this.m_CommandBuffer.AddComponent<PathOwner>(unfilteredChunkIndex, entity, default);
+                        }
                         // ISSUE: reference to a compiler-generated method
                         this.TickInVehicle(unfilteredChunkIndex, ref random, entity, prefabRef, navigation, currentVehicle, nativeArray7.Length != 0, ref resident, ref creature, ref human, ref currentLane, ref pathOwner, ref target, ref divert, groupCreatures);
                         // ISSUE: reference to a compiler-generated method
@@ -901,7 +928,16 @@ public partial class RPFResidentAISystem : GameSystemBase
                         DynamicBuffer<GroupCreature> groupCreatures;
                         CollectionUtils.TryGet<GroupCreature>(bufferAccessor, index, out groupCreatures);
                         // ISSUE: reference to a compiler-generated field
-                        PathOwner pathOwner = this.m_PathOwnerData[entity];
+                        bool hasPathOwner = this.m_PathOwnerData.HasComponent(entity);
+                        PathOwner pathOwner = default;
+                        if (hasPathOwner)
+                            pathOwner = this.m_PathOwnerData[entity];
+                        else
+                        {
+                            // Give the resident a default PathOwner so downstream code works
+                            // Use the jobIndex overload of ECB since you’re inside a parallel job
+                            this.m_CommandBuffer.AddComponent<PathOwner>(unfilteredChunkIndex, entity, default);
+                        }
                         // ISSUE: reference to a compiler-generated field
                         CreatureUtils.CheckUnspawned(unfilteredChunkIndex, entity, currentLane, human, isUnspawned, this.m_CommandBuffer);
                         // ISSUE: reference to a compiler-generated method

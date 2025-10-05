@@ -10,7 +10,7 @@ using System.Collections.Generic;
 namespace RealisticPathFinding
 {
     [FileLocation("ModsSettings\\" + nameof(RealisticPathFinding) + "\\" + nameof(RealisticPathFinding))]
-    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
+    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup, OtherGroup)]
     [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
     public class Setting : ModSetting
     {
@@ -25,6 +25,8 @@ namespace RealisticPathFinding
         public const string RoadBiasGroup = "RoadBias";
         public const string CongestionGroup = "Congestion";
         public const string CarModeWeightGroup = "CarModeWeightGroup";
+        public const string OtherSection = "Other";
+        public const string OtherGroup = "OtherGroup";
 
         public Setting(IMod mod) : base(mod)
         {
@@ -62,6 +64,13 @@ namespace RealisticPathFinding
             walk_long_ramp_m = 700f;
             walk_long_min_mult = 0.3f;
             ped_walk_time_factor = 10.0f;
+            cong_min_sample_sec = 0.2f;
+            cong_alpha = 0.2f;
+            cong_min_push_sec = 0.5f;
+            cong_max_ratio = 3f;
+            cong_max_density = 0.5f;
+            cong_min_ff_mps = 1f;
+            disable_ped_cost = false;
         }
 
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
@@ -153,8 +162,12 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         public float average_walk_speed_elderly { get; set; }
 
+        [SettingsUISection(PedestriansSection, PedestrianGroup)]
+        public bool disable_ped_cost { get; set; }
+
         [SettingsUISlider(min = 1f, max = 50f, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(disable_ped_cost))]
         public float ped_walk_time_factor { get; set; }
 
         [SettingsUISlider(min = 500f, max = 1000f, step = 50f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
@@ -171,27 +184,38 @@ namespace RealisticPathFinding
 
         [SettingsUISlider(min = 0.05f, max = 0.5f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
-        public float cong_alpha { get; set; } = 0.20f;
+        public float cong_alpha { get; set; }
 
         [SettingsUISlider(min = 0f, max = 2f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
-        public float cong_min_push_sec { get; set; } = 0.5f;  // UpdateThresholdSec
+        public float cong_min_push_sec { get; set; }
 
         [SettingsUISlider(min = 1f, max = 5f, step = 0.25f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
-        public float cong_max_ratio { get; set; } = 3.0f;     // MaxSlowdownRatio
+        public float cong_max_ratio { get; set; }
 
         [SettingsUISlider(min = 0f, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
-        public float cong_max_density { get; set; } = 0.50f;  // MaxDensityAdd
+        public float cong_max_density { get; set; }
 
         [SettingsUISlider(min = 0.5f, max = 5f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
-        public float cong_min_ff_mps { get; set; } = 1.0f;    // MinFreeflowMps
+        public float cong_min_ff_mps { get; set; }
 
         [SettingsUISlider(min = 0f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
-        public float cong_min_sample_sec { get; set; } = 0.2f; // MinSampleEmitSec
+        public float cong_min_sample_sec { get; set; }
+
+        [SettingsUIButton]
+        [SettingsUISection(OtherSection, OtherGroup)]
+        public bool Button
+        {
+            set
+            {
+                SetDefaults();
+            }
+
+        }
 
 
     }
@@ -212,6 +236,7 @@ namespace RealisticPathFinding
             // ----- Tabs / Sections -----
             { m_Setting.GetOptionTabLocaleID(Setting.TransitSection),     "Transit" },
             { m_Setting.GetOptionTabLocaleID(Setting.PedestriansSection), "Pedestrians" },
+            { m_Setting.GetOptionTabLocaleID(Setting.OtherSection), "Other" },
 
             // ----- Groups (shown inside each section) -----
             // NOTE: your constant is 'WaitingTine' (typo); label shows fine as "Waiting time".
@@ -231,7 +256,7 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionGroupLocaleID(Setting.LongDistanceGroup), "Long-distance walking" },
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.car_mode_weight)), "Car perceived-time weight" },
-            { m_Setting.GetOptionDescLocaleID(nameof(Setting.car_mode_weight)), "Multiplier on in-vehicle car time used for route choice. 1.0 = neutral; < 1.0 makes driving feel faster, > 1.0 makes it feel slower." },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.car_mode_weight)), "Multiplier on in-vehicle car time used for route choice. 1.0 = neutral; less than 1.0 makes driving feel faster, more than 1.0 makes it feel slower." },
 
 
             // ============================
@@ -351,6 +376,8 @@ namespace RealisticPathFinding
             "Walking cost multiplier" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.ped_walk_time_factor)),
             "Multiplies the pedestrian walking cost. 1.0 = no change; higher values make walking less attractive overall." },
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.disable_ped_cost)), "Disable Walking cost multiplier" },
+                { m_Setting.GetOptionDescLocaleID(nameof(Setting.disable_ped_cost)), $"Disable Walking cost multiplier. This will make this mod more compatible with other mods that affect pedestrian Path Finding" },
 
             // Group under Vehicles
             { m_Setting.GetOptionGroupLocaleID(Setting.CongestionGroup), "Congestion feedback" },
@@ -378,6 +405,9 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.cong_min_sample_sec)), "Min sample duration (s)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.cong_min_sample_sec)),
               "Ignore very short lane traversals under this duration when building the live average." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.Button)), "Reset Settings" },
+                { m_Setting.GetOptionDescLocaleID(nameof(Setting.Button)), $"Reset settings to default values" },
         };
 
             return dict;
