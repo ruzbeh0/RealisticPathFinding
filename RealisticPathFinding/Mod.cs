@@ -50,11 +50,13 @@ namespace RealisticPathFinding
 
             // Disable original systems
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem>().Enabled = false;
+            World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem.Actions>().Enabled = false;
 
             updateSystem.UpdateAfter<RealisticPathFinding.Systems.ScaleWaitingTimesSystem, Game.Simulation.WaitingPassengersSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<Game.Simulation.ResidentAISystem.Actions,
-                         RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<RealisticPathFinding.Systems.RPFResidentActionsSystem, RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<Game.Simulation.UpdateGroupSystem,
+                         RealisticPathFinding.Systems.RPFResidentActionsSystem>(SystemUpdatePhase.GameSimulation);
             //updateSystem.UpdateAfter<Game.Simulation.ResidentAISystem.Actions,RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
             //updateSystem.UpdateAfter<RealisticPathFinding.Systems.RPFResidentAISystem, Game.Simulation.ResidentAISystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.WalkSpeedUpdaterSystem>(SystemUpdatePhase.GameSimulation);
@@ -77,6 +79,10 @@ namespace RealisticPathFinding
             {
                 log.Info($"Patched: {patchedMethod.DeclaringType?.FullName}.{patchedMethod.Name}");
             }
+
+            var vanillaAI = World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem>();
+            var vanillaActions = World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem.Actions>();
+
 
 
         }

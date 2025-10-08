@@ -38,6 +38,13 @@ using Unity.Entities.Internal;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using NetLane = Game.Net.Lane;
+using NetConnectionLane = Game.Net.ConnectionLane;
+using NetSubLane = Game.Net.SubLane;
+
+using CreaturesResident = Game.Creatures.Resident;
+using PrefabResident = Game.Prefabs.Resident;
+
 
 #nullable disable
 namespace RealisticPathFinding.Systems;
@@ -50,7 +57,7 @@ public partial class RPFResidentAISystem : GameSystemBase
     private PathfindSetupSystem m_PathfindSetupSystem;
     private TimeSystem m_TimeSystem;
     private CityConfigurationSystem m_CityConfigurationSystem;
-    private ResidentAISystem.Actions m_Actions;
+    private RPFResidentActionsSystem m_Actions;
     private PersonalCarSelectData m_PersonalCarSelectData;
     private EntityQuery m_CreatureQuery;
     private EntityQuery m_GroupCreatureQuery;
@@ -64,6 +71,7 @@ public partial class RPFResidentAISystem : GameSystemBase
     private NativeArray<int> m_DeletedResidents;
     private RPFResidentAISystem.TypeHandle __TypeHandle;
     private bool _weAllocatedQueues;
+    public NativeParallelHashSet<Entity> m_AddedToMovingTree;
 
     [UnityEngine.Scripting.Preserve]
     protected override void OnCreate()
@@ -74,7 +82,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         this.m_PathfindSetupSystem = this.World.GetOrCreateSystemManaged<PathfindSetupSystem>();
         this.m_TimeSystem = this.World.GetOrCreateSystemManaged<TimeSystem>();
         this.m_CityConfigurationSystem = this.World.GetOrCreateSystemManaged<CityConfigurationSystem>();
-        this.m_Actions = this.World.GetOrCreateSystemManaged<ResidentAISystem.Actions>();
+        this.m_Actions = this.World.GetOrCreateSystemManaged<RPFResidentActionsSystem>();
         this.m_PersonalCarSelectData = new PersonalCarSelectData((SystemBase)this);
         this.m_CreatureQuery = this.GetEntityQuery(ComponentType.ReadWrite<Game.Creatures.Resident>(), ComponentType.ReadOnly<UpdateFrame>(), ComponentType.Exclude<GroupMember>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>(), ComponentType.Exclude<Stumbling>());
         this.m_GroupCreatureQuery = this.GetEntityQuery(ComponentType.ReadWrite<Game.Creatures.Resident>(), ComponentType.ReadOnly<GroupMember>(), ComponentType.ReadOnly<UpdateFrame>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>(), ComponentType.Exclude<Stumbling>());
@@ -4246,7 +4254,7 @@ public partial class RPFResidentAISystem : GameSystemBase
     }
 
     [BurstCompile]
-    private struct BoardingJob : IJob
+    public struct BoardingJob : IJob
     {
         [ReadOnly]
         public ComponentLookup<Citizen> m_Citizens;
@@ -4284,26 +4292,28 @@ public partial class RPFResidentAISystem : GameSystemBase
         public ComponentTypeSet m_CurrentLaneTypes;
         [ReadOnly]
         public ComponentTypeSet m_CurrentLaneTypesRelative;
-        public NativeQueue<RPFResidentAISystem.Boarding> m_BoardingQueue;
+        public NativeQueue<ResidentAISystem.Boarding> m_BoardingQueue;
         public NativeQuadTree<Entity, QuadTreeBoundsXZ> m_SearchTree;
         public EntityCommandBuffer m_CommandBuffer;
         public NativeQueue<StatisticsEvent>.ParallelWriter m_StatisticsEventQueue;
         public NativeQueue<ServiceFeeSystem.FeeEvent> m_FeeQueue;
+        [NativeDisableParallelForRestriction]
+        public NativeParallelHashSet<Entity> m_AddedThisFrame;
 
         public void Execute()
         {
             NativeParallelHashMap<Entity, int3> freeSpaceMap = new NativeParallelHashMap<Entity, int3>();
             // ISSUE: variable of a compiler-generated type
-            RPFResidentAISystem.Boarding boarding;
+            ResidentAISystem.Boarding boarding;
             // ISSUE: reference to a compiler-generated field
             while (this.m_BoardingQueue.TryDequeue(out boarding))
             {
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: variable of a compiler-generated type
-                RPFResidentAISystem.BoardingType type = boarding.m_Type;
+                ResidentAISystem.BoardingType type = boarding.m_Type;
                 switch (type)
                 {
-                    case RPFResidentAISystem.BoardingType.Exit:
+                    case ResidentAISystem.BoardingType.Exit:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
@@ -4314,7 +4324,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                         // ISSUE: reference to a compiler-generated method
                         this.ExitVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Household, boarding.m_Vehicle, boarding.m_CurrentLane, boarding.m_Position, boarding.m_Rotation, boarding.m_TicketPrice);
                         continue;
-                    case RPFResidentAISystem.BoardingType.TryEnter:
+                    case ResidentAISystem.BoardingType.TryEnter:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
@@ -4325,7 +4335,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                         // ISSUE: reference to a compiler-generated method
                         this.TryEnterVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Leader, boarding.m_Vehicle, boarding.m_LeaderVehicle, boarding.m_Waypoint, boarding.m_Position, boarding.m_Flags);
                         continue;
-                    case RPFResidentAISystem.BoardingType.FinishEnter:
+                    case ResidentAISystem.BoardingType.FinishEnter:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
@@ -4335,32 +4345,32 @@ public partial class RPFResidentAISystem : GameSystemBase
                         // ISSUE: reference to a compiler-generated method
                         this.FinishEnterVehicle(boarding.m_Passenger, boarding.m_Household, boarding.m_Vehicle, boarding.m_LeaderVehicle, boarding.m_CurrentLane, boarding.m_TicketPrice);
                         continue;
-                    case RPFResidentAISystem.BoardingType.CancelEnter:
+                    case ResidentAISystem.BoardingType.CancelEnter:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated method
                         this.CancelEnterVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Vehicle);
                         continue;
-                    case RPFResidentAISystem.BoardingType.RequireStop:
+                    case ResidentAISystem.BoardingType.RequireStop:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated method
                         this.RequireStop(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Vehicle, boarding.m_Position);
                         continue;
-                    case RPFResidentAISystem.BoardingType.WaitTimeExceeded:
+                    case ResidentAISystem.BoardingType.WaitTimeExceeded:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated method
                         this.WaitTimeExceeded(boarding.m_Passenger, boarding.m_Waypoint);
                         continue;
-                    case RPFResidentAISystem.BoardingType.WaitTimeEstimate:
+                    case ResidentAISystem.BoardingType.WaitTimeEstimate:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated method
                         this.WaitTimeEstimate(boarding.m_Waypoint, boarding.m_TicketPrice);
                         continue;
-                    case RPFResidentAISystem.BoardingType.FinishExit:
+                    case ResidentAISystem.BoardingType.FinishExit:
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated method
@@ -4405,8 +4415,11 @@ public partial class RPFResidentAISystem : GameSystemBase
                 // ISSUE: reference to a compiler-generated field
                 ObjectGeometryData geometryData = this.m_ObjectGeometryData[this.m_PrefabRefData[passenger].m_Prefab];
                 Bounds3 bounds = ObjectUtils.CalculateBounds(position, quaternion.identity, geometryData);
-                // ISSUE: reference to a compiler-generated field
-                this.m_SearchTree.Add(passenger, new QuadTreeBoundsXZ(bounds));
+                if (m_AddedThisFrame.Add(passenger))
+                {
+                    // build bounds/aabb as you already do
+                    this.m_SearchTree.Add(passenger, new QuadTreeBoundsXZ(bounds));
+                }
             }
             // ISSUE: reference to a compiler-generated field
             // ISSUE: reference to a compiler-generated field
@@ -4930,7 +4943,7 @@ public partial class RPFResidentAISystem : GameSystemBase
     }
 
     [BurstCompile]
-    private struct ResidentActionJob : IJob
+    public struct ResidentActionJob : IJob
     {
         [ReadOnly]
         public ComponentLookup<PrefabRef> m_PrefabRefData;
@@ -4939,7 +4952,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         public ComponentLookup<MailSender> m_MailSenderData;
         public ComponentLookup<HouseholdNeed> m_HouseholdNeedData;
         public ComponentLookup<Game.Routes.MailBox> m_MailBoxData;
-        public NativeQueue<RPFResidentAISystem.ResidentAction> m_ActionQueue;
+        public NativeQueue<ResidentAISystem.ResidentAction> m_ActionQueue;
         public EntityCommandBuffer m_CommandBuffer;
 
         public void Execute()
@@ -4950,17 +4963,17 @@ public partial class RPFResidentAISystem : GameSystemBase
             {
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: variable of a compiler-generated type
-                RPFResidentAISystem.ResidentAction action = this.m_ActionQueue.Dequeue();
+                ResidentAISystem.ResidentAction action = this.m_ActionQueue.Dequeue();
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: variable of a compiler-generated type
-                RPFResidentAISystem.ResidentActionType type = action.m_Type;
+                ResidentAISystem.ResidentActionType type = action.m_Type;
                 switch (type)
                 {
-                    case RPFResidentAISystem.ResidentActionType.SendMail:
+                    case ResidentAISystem.ResidentActionType.SendMail:
                         // ISSUE: reference to a compiler-generated method
                         this.SendMail(action);
                         break;
-                    case RPFResidentAISystem.ResidentActionType.GoShopping:
+                    case ResidentAISystem.ResidentActionType.GoShopping:
                         // ISSUE: reference to a compiler-generated method
                         this.GoShopping(action);
                         break;
@@ -4968,7 +4981,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             }
         }
 
-        private void SendMail(RPFResidentAISystem.ResidentAction action)
+        private void SendMail(ResidentAISystem.ResidentAction action)
         {
             MailSender component;
             Game.Routes.MailBox componentData1;
@@ -5001,7 +5014,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             this.m_CommandBuffer.SetComponentEnabled<MailSender>(action.m_Citizen, false);
         }
 
-        private void GoShopping(RPFResidentAISystem.ResidentAction action)
+        private void GoShopping(ResidentAISystem.ResidentAction action)
         {
             // ISSUE: reference to a compiler-generated field
             // ISSUE: reference to a compiler-generated field
