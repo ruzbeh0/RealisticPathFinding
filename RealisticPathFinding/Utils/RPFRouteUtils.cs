@@ -30,7 +30,7 @@ namespace RealisticPathFinding.Utils
         static bool IsTrunk(TransportType t) =>
             t == TransportType.Subway || t == TransportType.Train || t == TransportType.Ship || t == TransportType.Airplane;
 
-        public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, float feeder_trunk_transfer_penalty, float t2w_timefactor, float waiting_weight, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
+        public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, float feeder_trunk_transfer_penalty, float t2w_timefactor, float waiting_weight, float crowdness_stop_threashold, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
         {
             int num = 0;
             Entity lastBoardedRoute = Entity.Null;
@@ -113,17 +113,17 @@ namespace RealisticPathFinding.Utils
                     ref boardingVehicleData,
                     ref currentRouteData);
 
-                int seconds = 0;
+                int seconds = MathUtils.RoundToIntRandom(ref random, componentData.m_BoardingTime);
+                var wp = waitingPassengersData[pathElement.m_Target];
                 if (waitingPassengersData.HasComponent(pathElement.m_Target))
                 {
-                    var wp = waitingPassengersData[pathElement.m_Target];
-                    seconds = wp.m_AverageWaitingTime; // already in seconds
+                    seconds += wp.m_AverageWaitingTime; // already in seconds
 
                     // --- crowding factor using capacity normalization ---
                     float crowdingFactor = 1f;
                     if (capacity > 0)
                     {
-                        if(wp.m_Count > (float)capacity*0.7f)
+                        if(wp.m_Count > (float)capacity* crowdness_stop_threashold)
                         {
                             // signal ~ 0 when few waiting; ~1 when roughly one vehicle-load of people wait
                             float signal = math.saturate(wp.m_Count / (float)capacity);
@@ -135,10 +135,6 @@ namespace RealisticPathFinding.Utils
                     seconds = (int)math.ceil(seconds * crowdingFactor* waiting_weight);
 
                 }
-
-                // Fallback to prefab boarding time if average is missing/zero
-                if (seconds <= 0 && componentData.m_BoardingTime > 0f)
-                    seconds = MathUtils.RoundToIntRandom(ref random, componentData.m_BoardingTime);
 
                 if (seconds > 0)
                 {
@@ -168,6 +164,13 @@ namespace RealisticPathFinding.Utils
                     {
                         lastBoardedRoute = currentRoute;   // first boarding sets the baseline route; later changes are transfers
                         lastTransportType = componentData.m_TransportType;
+                    }
+
+                    seconds -= wp.m_AverageWaitingTime; // subtract wating time already counted by the game in PathUtils
+
+                    if(seconds < 0)
+                    {
+                        continue;
                     }
 
                     //Mod.log.Info($"Adding boarding time estimate of {seconds} seconds for transport type {componentData.m_TransportType}. IsTransfer:{isTransfer}");

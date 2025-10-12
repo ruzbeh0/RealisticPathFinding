@@ -92,6 +92,8 @@ namespace RealisticPathFinding.Systems
             var statsPW = m_CityStatisticsSystem.GetStatisticsEventQueue(out JobHandle statsWriter).AsParallelWriter();
             var feeQueue = m_ServiceFeeSystem.GetFeeQueue(out JobHandle feeWriter);
 
+            var addedThisFrame = new NativeParallelHashSet<Entity>(1024, Allocator.TempJob);
+
             // 3) Build BoardingJob with ALL lookups it needs (you already wired these in previous step)
             var boardingJob = new RPFResidentAISystem.BoardingJob
             {
@@ -133,12 +135,13 @@ namespace RealisticPathFinding.Systems
                 m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer(),
                 m_StatisticsEventQueue = statsPW,
                 m_FeeQueue = feeQueue,
-                m_AddedThisFrame = new NativeParallelHashSet<Entity>(1024, Allocator.TempJob)
+                m_AddedThisFrame = addedThisFrame
             };
 
             // 4) Combine the producer dep with the three writer deps (tree/stats/fee)
             var boardingDeps = JobUtils.CombineDependencies(dep, treeWriter, statsWriter, feeWriter);
             var boardingHandle = boardingJob.Schedule(boardingDeps);
+            addedThisFrame.Dispose(boardingHandle);
 
             // 5) Resident action (mail) job (small; same fields as vanilla)
             var actionJob = new RPFResidentAISystem.ResidentActionJob

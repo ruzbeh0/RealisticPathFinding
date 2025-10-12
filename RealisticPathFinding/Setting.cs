@@ -10,16 +10,18 @@ using System.Collections.Generic;
 namespace RealisticPathFinding
 {
     [FileLocation("ModsSettings\\" + nameof(RealisticPathFinding) + "\\" + nameof(RealisticPathFinding))]
-    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup, OtherGroup)]
+    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, TaxiGroup, PedestrianGroup, LongDistanceGroup, OtherGroup)]
     [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
     public class Setting : ModSetting
     {
         public const string PedestriansSection = "Pedestrians";
         public const string TransitSection = "Transit";
+        public const string TaxiSection = "Taxi";
         public const string VehicleSection = "Vehicles";
         public const string WaitingTimeGroup = "WaitingTine";
         public const string ModeWeightGroup = "ModeWeight";
         public const string PedestrianGroup = "Pedestrians";
+        public const string TaxiGroup = "Taxi";
         public const string LongDistanceGroup = "LongDistanceGroup";
         public const string TurnPenaltyGroup = "TurnPenalty";
         public const string RoadBiasGroup = "RoadBias";
@@ -49,8 +51,9 @@ namespace RealisticPathFinding
             alleyway_bias = 0.15f;
             uturn_sec_penalty = 4f;
             transfer_penalty = 1.5f;
+            feeder_trunk_transfer_penalty = 1.2f;
+            waiting_time_factor = 1.0f;
             scheduled_wt_factor = 0.5f;
-            crowdness_factor = 0.15f;
             bus_mode_weight = 1.00f;
             tram_mode_weight = 0.95f;
             subway_mode_weight = 0.9f;
@@ -59,11 +62,12 @@ namespace RealisticPathFinding
             average_walk_speed_teen = 3.3f;
             average_walk_speed_adult = 3.1f;
             average_walk_speed_elderly = 2.6f;
-            crowdness_factor = 0.2f;
+            crowdness_factor = 0.3f;
+            crowdness_stop_threashold = 0.65f;
             walk_long_comfort_m = 600f;
             walk_long_ramp_m = 700f;
             walk_long_min_mult = 0.3f;
-            ped_walk_time_factor = 10.0f;
+            ped_walk_time_factor = 5.0f;
             cong_min_sample_sec = 0.2f;
             cong_alpha = 0.2f;
             cong_min_push_sec = 0.5f;
@@ -71,6 +75,8 @@ namespace RealisticPathFinding
             cong_max_density = 0.5f;
             cong_min_ff_mps = 1f;
             disable_ped_cost = false;
+            taxi_passengers_waiting_threashold = 7f;
+            taxi_fare_increase = 0.3f;
         }
 
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
@@ -112,7 +118,7 @@ namespace RealisticPathFinding
 
         [SettingsUISlider(min = 0, max = 1, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
-        public float waiting_time_factor { get; set; } = 1.0f;
+        public float waiting_time_factor { get; set; } 
 
         [SettingsUISlider(min = 0, max = 3, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
@@ -120,15 +126,19 @@ namespace RealisticPathFinding
 
         [SettingsUISlider(min = 0, max = 3, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
-        public float feeder_trunk_transfer_penalty { get; set; } = 1.0f;
+        public float feeder_trunk_transfer_penalty { get; set; }
 
         [SettingsUISlider(min = 0, max = 1, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
         public float scheduled_wt_factor { get; set; }
 
-        [SettingsUISlider(min = 0, max = 0.5f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 0, max = 2f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
         public float crowdness_factor { get; set; }
+
+        [SettingsUISlider(min = 0, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(TransitSection, WaitingTimeGroup)]
+        public float crowdness_stop_threashold { get; set; }
 
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(TransitSection, ModeWeightGroup)]
@@ -145,6 +155,14 @@ namespace RealisticPathFinding
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(TransitSection, ModeWeightGroup)]
         public float train_mode_weight { get; set; }
+
+        [SettingsUISlider(min = 0, max = 20, step = 1, scalarMultiplier = 1, unit = Unit.kInteger)]
+        [SettingsUISection(TaxiSection, TaxiGroup)]
+        public float taxi_passengers_waiting_threashold { get; set; }
+
+        [SettingsUISlider(min = 0f, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(TaxiSection, TaxiGroup)]
+        public float taxi_fare_increase { get; set; }
 
         [SettingsUISlider(min = 0.5f, max = 4f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
@@ -236,6 +254,7 @@ namespace RealisticPathFinding
             // ----- Tabs / Sections -----
             { m_Setting.GetOptionTabLocaleID(Setting.TransitSection),     "Transit" },
             { m_Setting.GetOptionTabLocaleID(Setting.PedestriansSection), "Pedestrians" },
+            { m_Setting.GetOptionTabLocaleID(Setting.TaxiSection), "Taxi" },
             { m_Setting.GetOptionTabLocaleID(Setting.OtherSection), "Other" },
 
             // ----- Groups (shown inside each section) -----
@@ -244,6 +263,7 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionGroupLocaleID(Setting.ModeWeightGroup),  "Transport Type Weights" },
             { m_Setting.GetOptionGroupLocaleID(Setting.CarModeWeightGroup),  "Vehicle Weight" },
             { m_Setting.GetOptionGroupLocaleID(Setting.PedestrianGroup),  "Walking Speeds" },
+            { m_Setting.GetOptionGroupLocaleID(Setting.TaxiGroup),  "Taxi" },
 
             // New section (tab)
             { m_Setting.GetOptionTabLocaleID(Setting.VehicleSection), "Vehicles" },
@@ -280,6 +300,11 @@ namespace RealisticPathFinding
                     "Crowding factor (max extra wait)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_factor)),
                     "At high crowding (half of vehicle capacity waiting), increase perceived wait by up to this fraction (0.0–0.5). Example: 0.15 = +15% at/above capacity; 0 disables crowding." },
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_stop_threashold)),
+                      "Crowding threshold (load ratio)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_stop_threashold)),
+                     "Applies crowding delay when the number of people at a stop exceeds this fraction of vehicle capacity (0–1). Example: 0.5 means crowding begins when the stop is half a vehicle’s capacity." },
+
 
             // ============================
             // Transit → Mode weights group
@@ -307,6 +332,18 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Feeder→Trunk transfer penalty" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Multiplier applied to the wait time when transferring from a feeder mode (bus/tram) to a trunk mode (metro/train/ship/plane). Use 1.0 for no extra penalty; values < 1.0 reduce hassle, > 1.0 increase it." },
 
+            // ============================
+            // Taxi → Taxi options group
+            // ============================
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.taxi_passengers_waiting_threashold)),
+              "Waiting passengers threshold" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.taxi_passengers_waiting_threashold)),
+              "If more than this many passengers are queued at a stand, the taxi crowding rule activates for that stand." },
+            
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.taxi_fare_increase)),
+              "Crowding fare increase" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.taxi_fare_increase)),
+              "Extra fraction added to the starting fee when the stand is crowded. Example: 0.20 = +20% starting fee when the threshold is exceeded." },
 
             // ============================
             // Pedestrians → Speeds group

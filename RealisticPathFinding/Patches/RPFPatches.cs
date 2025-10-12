@@ -2,6 +2,7 @@
 using Game.City;
 using Game.Common;
 using Game.Companies;
+using Game.Pathfind;
 using Game.Prefabs;
 using Game.Prefabs.Climate;
 using Game.Routes;
@@ -14,6 +15,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -114,18 +116,7 @@ namespace RealisticPathFinding.Patches
             }
         }
 
-        [HarmonyPatch(typeof(ResidentAISystem.Actions), "OnUpdate")]
-        [HarmonyPrefix]
-        public static void Patch_Actions_OnUpdate_GuardQueues_Prefix(ResidentAISystem.Actions __instance)
-        {
-
-            if (!__instance.m_BoardingQueue.IsCreated)
-                __instance.m_BoardingQueue =
-                    new NativeQueue<ResidentAISystem.Boarding>(Allocator.TempJob);
-
-            if (!__instance.m_ActionQueue.IsCreated)
-                __instance.m_ActionQueue =
-                    new NativeQueue<ResidentAISystem.ResidentAction>(Allocator.TempJob);
-        }
     }
+
+
 }

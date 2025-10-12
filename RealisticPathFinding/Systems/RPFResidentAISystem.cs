@@ -274,6 +274,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             scheduled_factor = Mod.m_Setting.scheduled_wt_factor,
             transfer_penalty = Mod.m_Setting.transfer_penalty,
             feeder_trunk_transfer_penalty = Mod.m_Setting.feeder_trunk_transfer_penalty,
+            crowdness_stop_threashold = Mod.m_Setting.crowdness_stop_threashold,
             ComfortMeters = comfort,
             RampMeters = ramp,
             MinSpeedMult = minMult,
@@ -734,6 +735,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly] public ComponentLookup<Game.Prefabs.PublicTransportVehicleData> m_PublicTransportVehicleData;
         [ReadOnly] public float t2w_timefactor;
         [ReadOnly] public float waiting_weight;
+        [ReadOnly] public float crowdness_stop_threashold;
         public NativeQueue<SetupQueueItem>.ParallelWriter m_PathfindQueue;
         public NativeQueue<ResidentAISystem.Boarding>.ParallelWriter m_BoardingQueue;
         public NativeQueue<ResidentAISystem.ResidentAction>.ParallelWriter m_ActionQueue;
@@ -2414,7 +2416,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                 m_BoardingQueue = this.m_BoardingQueue
             };
 
-            RPFRouteUtils.StripTransportSegments<RPFResidentAISystem.ResidentTickJob.TransportEstimateBuffer>(ref random, length, pathElement1, this.m_RouteConnectedData, this.m_BoardingVehicleData, this.m_OwnerData, this.m_LaneData, this.m_ConnectionLaneData, this.m_CurveData, this.m_PrefabRefData, this.m_PrefabTransportStopData, this.m_SubLanes, this.m_AreaNodes, this.m_AreaTriangles, this.m_WaitingPassengers, this.m_CurrentRouteData, this.m_PublicTransportVehicleData, kCrowd, scheduled_factor, transfer_penalty, feeder_trunk_transfer_penalty, t2w_timefactor, waiting_weight, transportEstimateBuffer);
+            RPFRouteUtils.StripTransportSegments<RPFResidentAISystem.ResidentTickJob.TransportEstimateBuffer>(ref random, length, pathElement1, this.m_RouteConnectedData, this.m_BoardingVehicleData, this.m_OwnerData, this.m_LaneData, this.m_ConnectionLaneData, this.m_CurveData, this.m_PrefabRefData, this.m_PrefabTransportStopData, this.m_SubLanes, this.m_AreaNodes, this.m_AreaTriangles, this.m_WaitingPassengers, this.m_CurrentRouteData, this.m_PublicTransportVehicleData, kCrowd, scheduled_factor, transfer_penalty, feeder_trunk_transfer_penalty, t2w_timefactor, waiting_weight, crowdness_stop_threashold, transportEstimateBuffer);
             if (!this.m_OwnerData.HasComponent(currentLane.m_Lane))
                 return false;
             Entity owner = this.m_OwnerData[currentLane.m_Lane].m_Owner;

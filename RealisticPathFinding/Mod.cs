@@ -66,7 +66,7 @@ namespace RealisticPathFinding
                 updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
             }
             
-            //updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianDensityPenaltySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.TaxiStandCrowdingSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarCongestionEwmaSystem>(SystemUpdatePhase.GameSimulation);
 
             //Harmony
@@ -79,11 +79,6 @@ namespace RealisticPathFinding
             {
                 log.Info($"Patched: {patchedMethod.DeclaringType?.FullName}.{patchedMethod.Name}");
             }
-
-            var vanillaAI = World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem>();
-            var vanillaActions = World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem.Actions>();
-
-
 
         }
 
