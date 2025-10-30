@@ -8,40 +8,40 @@
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="This is a long description" /-->
 	<LongDescription>
-		Make your citizens choose routes that feel closer to real life.
+Make your citizens choose routes that feel closer to real life.
 
-		**BETA**: This mod is in early development. Overrall it is working but some adjustments might still be needed. Please report any issues on the forum or on discord.
+**BETA**: This mod is in early development. Overrall it is working but some adjustments might still be needed. Please report any issues on the forum or on discord.
 
-		PathFinding is the part of the game responsible for decidting which mode (walk, drive, transit) to use and which route to take. This mod aims at making that process be more realistic, by adding more factors to the decision making process. The goal is to make the routing feel more like real life, where people consider factors like waiting times, transfers, road types, congestion, and personal preferences.
+PathFinding is the part of the game responsible for decidting which mode (walk, drive, transit) to use and which route to take. This mod aims at making that process be more realistic, by adding more factors to the decision making process. The goal is to make the routing feel more like real life, where people consider factors like waiting times, transfers, road types, congestion, and personal preferences.
 
-		## Transit
+## Transit
 
-		* Waiting times: add waiting transit waiting times when trying to decided if transit should be used, also adds a adjustment factor to give timetabled modes (rail/ship/air) a lower perceived wait.
+* Waiting times: add waiting transit waiting times when trying to decided if transit should be used, also adds a adjustment factor to give timetabled modes (rail/ship/air) a lower perceived wait.
 
-		* Transfer penalty: adds a penalty for transit trips with transfer, making direct trips more attractive.
+* Transfer penalty: adds a penalty for transit trips with transfer, making direct trips more attractive.
 
-		* Crowding effect: packed stops will attract less riders.
+* Crowding effect: packed stops will attract less riders.
 
-		* Mode feel: set different “ride comfort” weights for bus, tram, subway, and train.
+* Mode feel: set different “ride comfort” weights for bus, tram, subway, and train.
 
-		## Walking
+## Walking
 
-		* Age-based walking speeds (averaging ~3 mph across the population).
+* Age-based walking speeds (averaging ~3 mph across the population).
 
-		* Long-distance aversion: very long all-walk trips become less attractive, short walks stay untouched.
+* Long-distance aversion: very long all-walk trips become less attractive, short walks stay untouched.
 
-		## Driving
+## Driving
 
-		* Turn delays at intersections (with extra for sharp turns/U-turns).
+* Turn delays at intersections (with extra for sharp turns/U-turns).
 
-		* Road hierarchy bias: prefers main roads, discourages neighborhood cut-throughs and alley rat-runs.
+* Road hierarchy bias: prefers main roads, discourages neighborhood cut-throughs and alley rat-runs.
 
-		* Congestion avoidance: vehicles avoid roads with heavy traffic.
+* Congestion avoidance: vehicles avoid roads with heavy traffic.
 
-		## Tweakable
-		Everything is configurable with simple in-game sliders—dial it toward realism or efficiency to fit your city.
+## Tweakable
+Everything is configurable with simple in-game sliders—dial it toward realism or efficiency to fit your city.
 
-		This mod is not compatible with Lazy Pedestrians
+This mod is not compatible with Lazy Pedestrians
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/logo.jpg" />
@@ -54,7 +54,7 @@
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/realistic-pathfinding-mod.1861163/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.4" />
+	<ModVersion Value="0.4.2" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.3.*" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -62,11 +62,7 @@
 	<!--Required DLC, can be set multiple times. Supported values are "Landmark Buildings", "San Fransisco Set", "Beach Properties", "Urban Promenades", "Modern Architecture"-->
 	<RequiredDLC Value="" />
 	<ChangeLog>
-* Fixed memory leak bug
-* Fixed incorrect assumption about transit waiting times
-* Recalibrated default parameters
-* Added crowding threshold factor for transit stops
-* Added crowding factors for Taxi
+* Updated for game version 1.3.6f1
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon-->
 	<ExternalLink Type="github" Url="https://github.com/ruzbeh0/RealisticPathFinding" />

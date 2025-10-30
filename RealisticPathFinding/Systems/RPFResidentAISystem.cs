@@ -179,6 +179,8 @@ public partial class RPFResidentAISystem : GameSystemBase
             m_HumanData = InternalCompilerInterface.GetComponentLookup<Human>(ref this.__TypeHandle.__Game_Creatures_Human_RW_ComponentLookup, ref this.CheckedStateRef),
             m_TransformData = InternalCompilerInterface.GetComponentLookup<Game.Objects.Transform>(ref this.__TypeHandle.__Game_Objects_Transform_RO_ComponentLookup, ref this.CheckedStateRef),
             m_OwnerData = InternalCompilerInterface.GetComponentLookup<Owner>(ref this.__TypeHandle.__Game_Common_Owner_RO_ComponentLookup, ref this.CheckedStateRef),
+      		m_TargetData = InternalCompilerInterface.GetComponentLookup<Game.Common.Target>(ref this.__TypeHandle.__Game_Common_Target_RO_ComponentLookup, ref this.CheckedStateRef),
+      		m_PseudoRandomSeedData = InternalCompilerInterface.GetComponentLookup<PseudoRandomSeed>(ref this.__TypeHandle.__Game_Common_PseudoRandomSeed_RO_ComponentLookup, ref this.CheckedStateRef),
             m_CurrentVehicleData = InternalCompilerInterface.GetComponentLookup<CurrentVehicle>(ref this.__TypeHandle.__Game_Creatures_CurrentVehicle_RO_ComponentLookup, ref this.CheckedStateRef),
             m_DestroyedData = InternalCompilerInterface.GetComponentLookup<Destroyed>(ref this.__TypeHandle.__Game_Common_Destroyed_RO_ComponentLookup, ref this.CheckedStateRef),
             m_DeletedData = InternalCompilerInterface.GetComponentLookup<Deleted>(ref this.__TypeHandle.__Game_Common_Deleted_RO_ComponentLookup, ref this.CheckedStateRef),
@@ -198,6 +200,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             m_GarageLaneData = InternalCompilerInterface.GetComponentLookup<GarageLane>(ref this.__TypeHandle.__Game_Net_GarageLane_RO_ComponentLookup, ref this.CheckedStateRef),
             m_PedestrianLaneData = InternalCompilerInterface.GetComponentLookup<Game.Net.PedestrianLane>(ref this.__TypeHandle.__Game_Net_PedestrianLane_RO_ComponentLookup, ref this.CheckedStateRef),
             m_ConnectionLaneData = InternalCompilerInterface.GetComponentLookup<Game.Net.ConnectionLane>(ref this.__TypeHandle.__Game_Net_ConnectionLane_RO_ComponentLookup, ref this.CheckedStateRef),
+      		m_LaneSignalData = InternalCompilerInterface.GetComponentLookup<Game.Net.LaneSignal>(ref this.__TypeHandle.__Game_Net_LaneSignal_RO_ComponentLookup, ref this.CheckedStateRef),
             m_HangaroundLocationData = InternalCompilerInterface.GetComponentLookup<HangaroundLocation>(ref this.__TypeHandle.__Game_Areas_HangaroundLocation_RO_ComponentLookup, ref this.CheckedStateRef),
             m_CitizenData = InternalCompilerInterface.GetComponentLookup<Citizen>(ref this.__TypeHandle.__Game_Citizens_Citizen_RO_ComponentLookup, ref this.CheckedStateRef),
             m_HouseholdMembers = InternalCompilerInterface.GetComponentLookup<HouseholdMember>(ref this.__TypeHandle.__Game_Citizens_HouseholdMember_RO_ComponentLookup, ref this.CheckedStateRef),
@@ -243,6 +246,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             m_HouseholdAnimals = InternalCompilerInterface.GetBufferLookup<HouseholdAnimal>(ref this.__TypeHandle.__Game_Citizens_HouseholdAnimal_RO_BufferLookup, ref this.CheckedStateRef),
             m_HouseholdCitizens = InternalCompilerInterface.GetBufferLookup<HouseholdCitizen>(ref this.__TypeHandle.__Game_Citizens_HouseholdCitizen_RO_BufferLookup, ref this.CheckedStateRef),
             m_ConnectedRoutes = InternalCompilerInterface.GetBufferLookup<ConnectedRoute>(ref this.__TypeHandle.__Game_Routes_ConnectedRoute_RO_BufferLookup, ref this.CheckedStateRef),
+      		m_RouteWaypoints = InternalCompilerInterface.GetBufferLookup<RouteWaypoint>(ref this.__TypeHandle.__Game_Routes_RouteWaypoint_RO_BufferLookup, ref this.CheckedStateRef),
             m_VehicleLayouts = InternalCompilerInterface.GetBufferLookup<LayoutElement>(ref this.__TypeHandle.__Game_Vehicles_LayoutElement_RO_BufferLookup, ref this.CheckedStateRef),
             m_CarNavigationLanes = InternalCompilerInterface.GetBufferLookup<CarNavigationLane>(ref this.__TypeHandle.__Game_Vehicles_CarNavigationLane_RO_BufferLookup, ref this.CheckedStateRef),
             m_ConnectedEdges = InternalCompilerInterface.GetBufferLookup<ConnectedEdge>(ref this.__TypeHandle.__Game_Net_ConnectedEdge_RO_BufferLookup, ref this.CheckedStateRef),
@@ -357,6 +361,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         public static RPFResidentAISystem.Boarding ExitVehicle(
           Entity passenger,
           Entity household,
+      	  Entity leader,
           Entity vehicle,
           HumanCurrentLane newCurrentLane,
           float3 position,
@@ -368,6 +373,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             {
                 m_Passenger = passenger,
                 m_Household = household,
+        		m_Leader = leader,
                 m_Vehicle = vehicle,
                 m_CurrentLane = newCurrentLane,
                 m_Position = position,
@@ -543,6 +549,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         [NativeDisableContainerSafetyRestriction]
         public ComponentTypeHandle<Human> m_HumanType;
         public ComponentTypeHandle<HumanCurrentLane> m_CurrentLaneType;
+    	[NativeDisableContainerSafetyRestriction]
         public ComponentTypeHandle<Game.Common.Target> m_TargetType;
         public ComponentTypeHandle<Divert> m_DivertType;
         [ReadOnly]
@@ -551,6 +558,11 @@ public partial class RPFResidentAISystem : GameSystemBase
         public ComponentLookup<Game.Objects.Transform> m_TransformData;
         [ReadOnly]
         public ComponentLookup<Owner> m_OwnerData;
+    	[NativeDisableContainerSafetyRestriction]
+    	[ReadOnly]
+    	public ComponentLookup<Game.Common.Target> m_TargetData;
+    	[ReadOnly]
+    	public ComponentLookup<PseudoRandomSeed> m_PseudoRandomSeedData;
         [ReadOnly]
         public ComponentLookup<CurrentVehicle> m_CurrentVehicleData;
         [ReadOnly]
@@ -590,6 +602,8 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly]
         public ComponentLookup<Game.Net.ConnectionLane> m_ConnectionLaneData;
         [ReadOnly]
+    	public ComponentLookup<Game.Net.LaneSignal> m_LaneSignalData;
+    	[ReadOnly]
         public ComponentLookup<HangaroundLocation> m_HangaroundLocationData;
         [ReadOnly]
         public ComponentLookup<Citizen> m_CitizenData;
@@ -680,6 +694,8 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly]
         public BufferLookup<ConnectedRoute> m_ConnectedRoutes;
         [ReadOnly]
+    	public BufferLookup<RouteWaypoint> m_RouteWaypoints;
+    	[ReadOnly]
         public BufferLookup<LayoutElement> m_VehicleLayouts;
         [ReadOnly]
         public BufferLookup<CarNavigationLane> m_CarNavigationLanes;
@@ -1085,7 +1101,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                     if ((resident.m_Flags & ResidentFlags.Disembarking) != ResidentFlags.None)
                     {
                         // ISSUE: reference to a compiler-generated method
-                        this.ExitVehicle(entity, jobIndex, ref random, entity1, prefabRef, currentVehicle, ref resident, ref human, ref divert, ref pathOwner);
+            			this.ExitVehicle(entity, jobIndex, ref random, entity1, prefabRef, currentVehicle, groupMember, ref resident, ref human, ref divert, ref pathOwner);
                     }
                 }
                 // ISSUE: reference to a compiler-generated method
@@ -1344,7 +1360,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                         if ((resident.m_Flags & ResidentFlags.Disembarking) != ResidentFlags.None)
                         {
                             // ISSUE: reference to a compiler-generated method
-                            this.ExitVehicle(entity, jobIndex, ref random, entity1, prefabRef, currentVehicle, ref resident, ref human, ref divert, ref pathOwner);
+              				this.ExitVehicle(entity, jobIndex, ref random, entity1, prefabRef, currentVehicle, new GroupMember(), ref resident, ref human, ref divert, ref pathOwner);
                         }
                         else if ((currentVehicle.m_Flags & CreatureVehicleFlags.Leader) == (CreatureVehicleFlags)0)
                         {
@@ -1759,6 +1775,7 @@ public partial class RPFResidentAISystem : GameSystemBase
           Entity controllerVehicle,
           PrefabRef prefabRef,
           CurrentVehicle currentVehicle,
+      	  GroupMember groupMember,
           ref Game.Creatures.Resident resident,
           ref Human human,
           ref Divert divert,
@@ -1808,6 +1825,9 @@ public partial class RPFResidentAISystem : GameSystemBase
                 BufferLookup<AnimationMotion> animationMotionBuffers = new BufferLookup<AnimationMotion>();
                 bool isDriver = (currentVehicle.m_Flags & CreatureVehicleFlags.Driver) > (CreatureVehicleFlags)0;
                 ActivityCondition conditions = CreatureUtils.GetConditions(human);
+        		PseudoRandomSeed componentData3;
+        		// ISSUE: reference to a compiler-generated field
+        		this.m_PseudoRandomSeedData.TryGetComponent(entity, out componentData3);
                 ActivityMask activityMask;
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
@@ -1816,7 +1836,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
-                Game.Objects.Transform vehicleDoorPosition = CreatureUtils.GetVehicleDoorPosition(ref random, ActivityType.Exit, conditions, vehicleTransform, targetPosition, isDriver, this.m_LefthandTraffic, prefabRef.m_Prefab, currentVehicle.m_Vehicle, new DynamicBuffer<MeshGroup>(), ref this.m_PublicTransportData, ref this.m_TrainData, ref this.m_ControllerData, ref this.m_PrefabRefData, ref this.m_PrefabCarData, ref this.m_PrefabActivityLocationElements, ref subMeshGroupBuffers, ref characterElementBuffers, ref subMeshBuffers, ref animationClipBuffers, ref animationMotionBuffers, out activityMask, out AnimatedPropID _);
+        		Game.Objects.Transform vehicleDoorPosition = CreatureUtils.GetVehicleDoorPosition(ref random, ActivityType.Exit, conditions, vehicleTransform, componentData3, targetPosition, isDriver, this.m_LefthandTraffic, prefabRef.m_Prefab, currentVehicle.m_Vehicle, new DynamicBuffer<MeshGroup>(), ref this.m_PublicTransportData, ref this.m_TrainData, ref this.m_ControllerData, ref this.m_PrefabRefData, ref this.m_PrefabCarData, ref this.m_PrefabActivityLocationElements, ref subMeshGroupBuffers, ref characterElementBuffers, ref subMeshBuffers, ref animationClipBuffers, ref animationMotionBuffers, out activityMask, out AnimatedPropID _);
                 if (pathOwner.m_ElementIndex < pathElement1.Length && (pathOwner.m_State & PathFlags.Obsolete) == (PathFlags)0)
                 {
                     // ISSUE: reference to a compiler-generated field
@@ -1883,9 +1903,9 @@ public partial class RPFResidentAISystem : GameSystemBase
                     // ISSUE: reference to a compiler-generated field
                     if (this.m_UnspawnedData.HasComponent(currentVehicle.m_Vehicle))
                         newCurrentLane.m_Flags |= CreatureLaneFlags.EmergeUnspawned;
-                    PathOwner componentData;
+          			PathOwner componentData4;
                     // ISSUE: reference to a compiler-generated field
-                    if (this.m_PathOwnerData.TryGetComponent(controllerVehicle, out componentData) && VehicleUtils.PathfindFailed(componentData))
+          			if (this.m_PathOwnerData.TryGetComponent(controllerVehicle, out componentData4) && VehicleUtils.PathfindFailed(componentData4))
                     {
                         newCurrentLane.m_Flags |= CreatureLaneFlags.EmergeUnspawned;
                         pathOwner.m_State |= PathFlags.Stuck;
@@ -1895,7 +1915,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                     newCurrentLane.m_Flags |= CreatureLaneFlags.EndOfPath | CreatureLaneFlags.EndReached;
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated method
-                this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.ExitVehicle(entity, household, currentVehicle.m_Vehicle, newCurrentLane, vehicleDoorPosition.m_Position, vehicleDoorPosition.m_Rotation, ticketPrice));
+        		this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.ExitVehicle(entity, household, groupMember.m_Leader, currentVehicle.m_Vehicle, newCurrentLane, vehicleDoorPosition.m_Position, vehicleDoorPosition.m_Rotation, ticketPrice));
             }
             else
             {
@@ -1903,7 +1923,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                 Game.Objects.Transform transform = this.m_TransformData[entity];
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated method
-                this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.ExitVehicle(entity, household, currentVehicle.m_Vehicle, new HumanCurrentLane(), transform.m_Position, transform.m_Rotation, ticketPrice));
+        		this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.ExitVehicle(entity, household, groupMember.m_Leader, currentVehicle.m_Vehicle, new HumanCurrentLane(), transform.m_Position, transform.m_Rotation, ticketPrice));
                 pathOwner.m_State &= ~PathFlags.Failed;
                 pathOwner.m_State |= PathFlags.Obsolete;
             }
@@ -1913,9 +1933,9 @@ public partial class RPFResidentAISystem : GameSystemBase
             switch (divert.m_Purpose)
             {
                 case Game.Citizens.Purpose.None:
-                    TravelPurpose componentData3;
+          		TravelPurpose componentData;
                     // ISSUE: reference to a compiler-generated field
-                    if (!this.m_TravelPurposeData.TryGetComponent(resident.m_Citizen, out componentData3) || componentData3.m_Purpose != Game.Citizens.Purpose.EmergencyShelter)
+          			if (!this.m_TravelPurposeData.TryGetComponent(resident.m_Citizen, out componentData) || componentData.m_Purpose != Game.Citizens.Purpose.EmergencyShelter)
                         break;
                     human.m_Flags |= HumanFlags.Run | HumanFlags.Emergency;
                     break;
@@ -2758,7 +2778,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                 Game.Prefabs.SpawnLocationData componentData2;
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
-                if (this.m_PrefabRefData.TryGetComponent(currentLane.m_Lane, out componentData1) && this.m_PrefabSpawnLocationData.TryGetComponent(componentData1.m_Prefab, out componentData2) && (((int)componentData2.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.BenchSitting).m_Mask) != 0 || ((int)componentData2.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.PullUps).m_Mask) != 0))
+        		if (this.m_PrefabRefData.TryGetComponent(currentLane.m_Lane, out componentData1) && this.m_PrefabSpawnLocationData.TryGetComponent(componentData1.m_Prefab, out componentData2) && (((int) componentData2.m_ActivityMask.m_Mask & (int) new ActivityMask(ActivityType.BenchSitting).m_Mask) != 0 || ((int) componentData2.m_ActivityMask.m_Mask & (int) new ActivityMask(ActivityType.PullUps).m_Mask) != 0 || ((int) componentData2.m_ActivityMask.m_Mask & (int) new ActivityMask(ActivityType.Reading).m_Mask) != 0))
                     ignoreFlags |= ResidentFlags.IgnoreBenches;
             }
             else
@@ -2789,7 +2809,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                             // ISSUE: reference to a compiler-generated field
                             Game.Prefabs.SpawnLocationData spawnLocationData = this.m_PrefabSpawnLocationData[this.m_PrefabRefData[spawnLocationElement.m_SpawnLocation].m_Prefab];
                             ResidentFlags residentFlags2 = ResidentFlags.None;
-                            if (((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.BenchSitting).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.PullUps).m_Mask) != 0)
+              				if (((int) spawnLocationData.m_ActivityMask.m_Mask & (int) new ActivityMask(ActivityType.BenchSitting).m_Mask) != 0 || ((int) spawnLocationData.m_ActivityMask.m_Mask & (int) new ActivityMask(ActivityType.PullUps).m_Mask) != 0 || ((int) spawnLocationData.m_ActivityMask.m_Mask & (int) new ActivityMask(ActivityType.Reading).m_Mask) != 0)
                                 residentFlags2 |= ResidentFlags.IgnoreBenches;
                             if (((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.Standing).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.GroundLaying).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.GroundSitting).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.PushUps).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.SitUps).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.JumpingJacks).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.JumpingLunges).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.Squats).m_Mask) != 0 || ((int)spawnLocationData.m_ActivityMask.m_Mask & (int)new ActivityMask(ActivityType.Yoga).m_Mask) != 0)
                                 residentFlags2 |= ResidentFlags.IgnoreAreas;
@@ -3237,7 +3257,8 @@ public partial class RPFResidentAISystem : GameSystemBase
             if (this.m_PedestrianLaneData.HasComponent(currentLane.m_Lane))
             {
                 // ISSUE: reference to a compiler-generated field
-                if ((this.m_PedestrianLaneData[currentLane.m_Lane].m_Flags & PedestrianLaneFlags.Crosswalk) == (PedestrianLaneFlags)0)
+        		// ISSUE: reference to a compiler-generated field
+        		if ((this.m_PedestrianLaneData[currentLane.m_Lane].m_Flags & PedestrianLaneFlags.Crosswalk) == (PedestrianLaneFlags) 0 && !this.m_LaneSignalData.HasComponent(currentLane.m_Lane))
                     return;
                 pathOwner.m_ElementIndex = 0;
                 // ISSUE: reference to a compiler-generated field
@@ -3266,7 +3287,8 @@ public partial class RPFResidentAISystem : GameSystemBase
                     ignoreLanes.Add(lane);
                     yy.x = yy.y;
                     // ISSUE: reference to a compiler-generated field
-                    if ((this.m_PedestrianLaneData[lane].m_Flags & PedestrianLaneFlags.Crosswalk) == (PedestrianLaneFlags)0)
+          			// ISSUE: reference to a compiler-generated field
+          			if ((this.m_PedestrianLaneData[lane].m_Flags & PedestrianLaneFlags.Crosswalk) == (PedestrianLaneFlags) 0 && !this.m_LaneSignalData.HasComponent(lane))
                     {
                         yy.y = random.NextFloat(0.0f, 1f);
                         pathElement.Add(new PathElement(lane, yy));
@@ -3610,7 +3632,9 @@ public partial class RPFResidentAISystem : GameSystemBase
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
-                if (RouteUtils.GetBoardingVehicle(currentLane.m_Lane, target1, target2, minDeparture, ref this.m_OwnerData, ref this.m_RouteConnectedData, ref this.m_BoardingVehicleData, ref this.m_CurrentRouteData, ref this.m_AccessLaneLaneData, ref this.m_PublicTransportData, ref this.m_TaxiData, ref this.m_ConnectedRoutes, out vehicle, out testing, out obsolete))
+        // ISSUE: reference to a compiler-generated field
+        // ISSUE: reference to a compiler-generated field
+        if (RouteUtils.GetBoardingVehicle(currentLane.m_Lane, target1, target2, minDeparture, ref this.m_OwnerData, ref this.m_TargetData, ref this.m_RouteConnectedData, ref this.m_BoardingVehicleData, ref this.m_CurrentRouteData, ref this.m_AccessLaneLaneData, ref this.m_PublicTransportData, ref this.m_TaxiData, ref this.m_ConnectedRoutes, ref this.m_RouteWaypoints, out vehicle, out testing, out obsolete))
                 {
                     // ISSUE: reference to a compiler-generated method
                     this.TryEnterVehicle(entity, vehicle, target1, ref resident, ref currentLane);
@@ -3980,6 +4004,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             {
                 destination.m_ActivityMask.m_Mask &= ~new ActivityMask(ActivityType.BenchSitting).m_Mask;
                 destination.m_ActivityMask.m_Mask &= ~new ActivityMask(ActivityType.PullUps).m_Mask;
+        		destination.m_ActivityMask.m_Mask &= ~new ActivityMask(ActivityType.Reading).m_Mask;
             }
             if ((resident.m_Flags & ResidentFlags.IgnoreAreas) != ResidentFlags.None)
             {
@@ -4273,6 +4298,16 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly]
         public ComponentLookup<PersonalCarData> m_PrefabPersonalCarData;
         [ReadOnly]
+    	public ComponentLookup<Game.Common.Target> m_Targets;
+    	[ReadOnly]
+    	public ComponentLookup<Connected> m_Connecteds;
+    	[ReadOnly]
+    	public ComponentLookup<Owner> m_Owners;
+    	[ReadOnly]
+    	public ComponentLookup<Game.Objects.OutsideConnection> m_OutsideConnections;
+    	[ReadOnly]
+    	public ComponentLookup<HumanCurrentLane> m_HumanCurrentLanes;
+    	[ReadOnly]
         public BufferLookup<GroupCreature> m_GroupCreatures;
         [ReadOnly]
         public BufferLookup<LayoutElement> m_VehicleLayouts;
@@ -4298,13 +4333,14 @@ public partial class RPFResidentAISystem : GameSystemBase
         public NativeQuadTree<Entity, QuadTreeBoundsXZ> m_SearchTree;
         public EntityCommandBuffer m_CommandBuffer;
         public NativeQueue<StatisticsEvent>.ParallelWriter m_StatisticsEventQueue;
+    	public NativeQueue<TransportUsageEvent> m_TransportUsageQueue;
         public NativeQueue<ServiceFeeSystem.FeeEvent> m_FeeQueue;
         [NativeDisableParallelForRestriction]
         public NativeParallelHashSet<Entity> m_AddedThisFrame;
 
         public void Execute()
         {
-            NativeParallelHashMap<Entity, int3> freeSpaceMap = new NativeParallelHashMap<Entity, int3>();
+      		NativeParallelHashMap<Entity, int3> freeSpaceMap = new NativeParallelHashMap<Entity, int3>();
             // ISSUE: variable of a compiler-generated type
             ResidentAISystem.Boarding boarding;
             // ISSUE: reference to a compiler-generated field
@@ -4324,7 +4360,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated method
-                        this.ExitVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Household, boarding.m_Vehicle, boarding.m_CurrentLane, boarding.m_Position, boarding.m_Rotation, boarding.m_TicketPrice);
+            			this.ExitVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Household, boarding.m_Leader, boarding.m_Vehicle, boarding.m_CurrentLane, boarding.m_Position, boarding.m_Rotation, boarding.m_TicketPrice);
                         continue;
                     case ResidentAISystem.BoardingType.TryEnter:
                         // ISSUE: reference to a compiler-generated field
@@ -4391,6 +4427,7 @@ public partial class RPFResidentAISystem : GameSystemBase
           ref NativeParallelHashMap<Entity, int3> freeSpaceMap,
           Entity passenger,
           Entity household,
+      	  Entity leader,
           Entity vehicle,
           HumanCurrentLane newCurrentLane,
           float3 position,
@@ -4405,6 +4442,14 @@ public partial class RPFResidentAISystem : GameSystemBase
             resident.m_Timer = 0;
             // ISSUE: reference to a compiler-generated field
             this.m_Residents[passenger] = resident;
+      		HumanCurrentLane componentData;
+      		// ISSUE: reference to a compiler-generated field
+      		if (newCurrentLane.m_Lane == Entity.Null && this.m_HumanCurrentLanes.TryGetComponent(leader, out componentData))
+      		{
+        		newCurrentLane.m_Lane = componentData.m_Lane;
+        		newCurrentLane.m_CurvePosition = componentData.m_CurvePosition;
+        		newCurrentLane.m_Flags |= componentData.m_Flags & ~CreatureLaneFlags.EmergeUnspawned | CreatureLaneFlags.Leader;
+      		}
             // ISSUE: reference to a compiler-generated field
             if (this.m_LaneObjects.HasBuffer(newCurrentLane.m_Lane))
             {
@@ -4417,10 +4462,18 @@ public partial class RPFResidentAISystem : GameSystemBase
                 // ISSUE: reference to a compiler-generated field
                 ObjectGeometryData geometryData = this.m_ObjectGeometryData[this.m_PrefabRefData[passenger].m_Prefab];
                 Bounds3 bounds = ObjectUtils.CalculateBounds(position, quaternion.identity, geometryData);
-                if (m_AddedThisFrame.Add(passenger))
+
+                var qtBounds = new QuadTreeBoundsXZ(bounds);
+                if (math.all(qtBounds.m_Bounds.min <= qtBounds.m_Bounds.max) &&
+                    !math.any(!math.isfinite(qtBounds.m_Bounds.min)) &&
+                    !math.any(!math.isfinite(qtBounds.m_Bounds.max)))
                 {
-                    // build bounds/aabb as you already do
-                    this.m_SearchTree.Add(passenger, new QuadTreeBoundsXZ(bounds));
+                    if (m_AddedThisFrame.Add(passenger))
+                    {
+                        m_SearchTree.TryRemove(passenger);   // cheap, no-throw if missing
+                        m_SearchTree.Add(passenger, qtBounds);
+                    }
+                    
                 }
             }
             // ISSUE: reference to a compiler-generated field
@@ -4468,8 +4521,10 @@ public partial class RPFResidentAISystem : GameSystemBase
           Entity vehicle)
         {
             // ISSUE: reference to a compiler-generated field
+      		if (this.m_Passengers.HasBuffer(vehicle))
+      		{
             // ISSUE: reference to a compiler-generated field
-            if (this.m_Passengers.HasBuffer(vehicle) && CollectionUtils.RemoveValue<Passenger>(this.m_Passengers[vehicle], new Passenger(passenger)))
+        	if (CollectionUtils.RemoveValue<Passenger>(this.m_Passengers[vehicle], new Passenger(passenger)))
             {
                 // ISSUE: reference to a compiler-generated method
                 int3 freeSpace = this.GetFreeSpace(ref freeSpaceMap, vehicle);
@@ -4477,6 +4532,41 @@ public partial class RPFResidentAISystem : GameSystemBase
                 freeSpaceMap[vehicle] = freeSpace;
             }
             // ISSUE: reference to a compiler-generated field
+        PrefabRef prefabRef = this.m_PrefabRefData[vehicle];
+        // ISSUE: reference to a compiler-generated field
+        // ISSUE: reference to a compiler-generated field
+        if (this.m_PublicTransportVehicleData.HasComponent(prefabRef.m_Prefab) && this.m_PublicTransports.HasComponent(vehicle))
+        {
+          // ISSUE: reference to a compiler-generated field
+          TransportType transportType = this.m_PublicTransportVehicleData[prefabRef.m_Prefab].m_TransportType;
+          switch (transportType)
+          {
+            case TransportType.Train:
+            case TransportType.Ship:
+            case TransportType.Airplane:
+              Game.Common.Target componentData1;
+              Connected componentData2;
+              // ISSUE: reference to a compiler-generated field
+              // ISSUE: reference to a compiler-generated field
+              // ISSUE: reference to a compiler-generated field
+              if (this.m_Targets.TryGetComponent(vehicle, out componentData1) && this.m_Connecteds.TryGetComponent(componentData1.m_Target, out componentData2) && !this.m_OutsideConnections.HasComponent(componentData2.m_Connected))
+              {
+                // ISSUE: reference to a compiler-generated field
+                Entity topOwner = BuildingUtils.GetTopOwner(componentData2.m_Connected, ref this.m_Owners);
+                // ISSUE: reference to a compiler-generated field
+                this.m_TransportUsageQueue.Enqueue(new TransportUsageEvent()
+                {
+                  m_Building = topOwner,
+                  m_TransportedPassenger = 1,
+                  m_TransportType = transportType
+                });
+                break;
+              }
+              break;
+          }
+        }
+      }
+      // ISSUE: reference to a compiler-generated field
             this.m_CommandBuffer.RemoveComponent<CurrentVehicle>(passenger);
             // ISSUE: reference to a compiler-generated field
             this.m_CommandBuffer.AddComponent<BatchesUpdated>(passenger, new BatchesUpdated());
@@ -4755,10 +4845,30 @@ public partial class RPFResidentAISystem : GameSystemBase
                 {
                     // ISSUE: reference to a compiler-generated field
                     transportType = this.m_PublicTransportVehicleData[prefabRef.m_Prefab].m_TransportType;
-                    Game.Vehicles.PublicTransport componentData;
+          			Game.Vehicles.PublicTransport componentData1;
                     // ISSUE: reference to a compiler-generated field
-                    if (this.m_PublicTransports.TryGetComponent(controllerVehicle, out componentData) && (componentData.m_State & (PublicTransportFlags.Evacuating | PublicTransportFlags.PrisonerTransport)) != (PublicTransportFlags)0)
+          if (this.m_PublicTransports.TryGetComponent(controllerVehicle, out componentData1))
+          {
+            if ((componentData1.m_State & (PublicTransportFlags.Evacuating | PublicTransportFlags.PrisonerTransport)) != (PublicTransportFlags) 0)
                         transportType = TransportType.None;
+            Game.Common.Target componentData2;
+            Connected componentData3;
+            // ISSUE: reference to a compiler-generated field
+            // ISSUE: reference to a compiler-generated field
+            // ISSUE: reference to a compiler-generated field
+            if ((transportType == TransportType.Airplane || transportType == TransportType.Train || transportType == TransportType.Ship) && this.m_Targets.TryGetComponent(controllerVehicle, out componentData2) && this.m_Connecteds.TryGetComponent(componentData2.m_Target, out componentData3) && !this.m_OutsideConnections.HasComponent(componentData3.m_Connected))
+            {
+              // ISSUE: reference to a compiler-generated field
+              Entity topOwner = BuildingUtils.GetTopOwner(componentData3.m_Connected, ref this.m_Owners);
+              // ISSUE: reference to a compiler-generated field
+              this.m_TransportUsageQueue.Enqueue(new TransportUsageEvent()
+              {
+                m_Building = topOwner,
+                m_TransportedPassenger = 1,
+                m_TransportType = transportType
+              });
+            }
+          }
                 }
             }
             // ISSUE: reference to a compiler-generated field
@@ -4771,12 +4881,12 @@ public partial class RPFResidentAISystem : GameSystemBase
             this.m_Creatures[passenger] = creature;
             // ISSUE: reference to a compiler-generated field
             this.m_Queues[passenger].Clear();
-            Citizen componentData1;
+      		Citizen componentData;
             // ISSUE: reference to a compiler-generated field
             // ISSUE: reference to a compiler-generated field
-            if (this.m_Citizens.TryGetComponent(this.m_Residents[passenger].m_Citizen, out componentData1))
+      		if (this.m_Citizens.TryGetComponent(this.m_Residents[passenger].m_Citizen, out componentData))
             {
-                PassengerType parameter = (componentData1.m_State & CitizenFlags.Tourist) != CitizenFlags.None ? PassengerType.Tourist : PassengerType.Citizen;
+        		PassengerType parameter = (componentData.m_State & CitizenFlags.Tourist) != CitizenFlags.None ? PassengerType.Tourist : PassengerType.Citizen;
                 switch (transportType)
                 {
                     case TransportType.Bus:
@@ -4807,6 +4917,10 @@ public partial class RPFResidentAISystem : GameSystemBase
                         // ISSUE: reference to a compiler-generated method
                         this.EnqueueStat(StatisticType.PassengerCountSubway, 1, (int)parameter);
                         break;
+          			case TransportType.Ferry:
+            			// ISSUE: reference to a compiler-generated method
+            			this.EnqueueStat(StatisticType.PassengerCountFerry, 1, (int) parameter);
+            			break;
                 }
             }
             // ISSUE: reference to a compiler-generated field
@@ -5080,6 +5194,10 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly]
         public ComponentLookup<Owner> __Game_Common_Owner_RO_ComponentLookup;
         [ReadOnly]
+    	public ComponentLookup<Game.Common.Target> __Game_Common_Target_RO_ComponentLookup;
+    	[ReadOnly]
+    	public ComponentLookup<PseudoRandomSeed> __Game_Common_PseudoRandomSeed_RO_ComponentLookup;
+    	[ReadOnly]
         public ComponentLookup<CurrentVehicle> __Game_Creatures_CurrentVehicle_RO_ComponentLookup;
         [ReadOnly]
         public ComponentLookup<Destroyed> __Game_Common_Destroyed_RO_ComponentLookup;
@@ -5118,6 +5236,8 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly]
         public ComponentLookup<Game.Net.ConnectionLane> __Game_Net_ConnectionLane_RO_ComponentLookup;
         [ReadOnly]
+    	public ComponentLookup<Game.Net.LaneSignal> __Game_Net_LaneSignal_RO_ComponentLookup;
+    	[ReadOnly]
         public ComponentLookup<HangaroundLocation> __Game_Areas_HangaroundLocation_RO_ComponentLookup;
         [ReadOnly]
         public ComponentLookup<Citizen> __Game_Citizens_Citizen_RO_ComponentLookup;
@@ -5212,6 +5332,8 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly]
         public BufferLookup<ConnectedRoute> __Game_Routes_ConnectedRoute_RO_BufferLookup;
         [ReadOnly]
+    	public BufferLookup<RouteWaypoint> __Game_Routes_RouteWaypoint_RO_BufferLookup;
+    	[ReadOnly]
         public BufferLookup<LayoutElement> __Game_Vehicles_LayoutElement_RO_BufferLookup;
         [ReadOnly]
         public BufferLookup<CarNavigationLane> __Game_Vehicles_CarNavigationLane_RO_BufferLookup;
@@ -5276,6 +5398,10 @@ public partial class RPFResidentAISystem : GameSystemBase
             // ISSUE: reference to a compiler-generated field
             this.__Game_Common_Owner_RO_ComponentLookup = state.GetComponentLookup<Owner>(true);
             // ISSUE: reference to a compiler-generated field
+      		this.__Game_Common_Target_RO_ComponentLookup = state.GetComponentLookup<Game.Common.Target>(true);
+      		// ISSUE: reference to a compiler-generated field
+      		this.__Game_Common_PseudoRandomSeed_RO_ComponentLookup = state.GetComponentLookup<PseudoRandomSeed>(true);
+      		// ISSUE: reference to a compiler-generated field
             this.__Game_Creatures_CurrentVehicle_RO_ComponentLookup = state.GetComponentLookup<CurrentVehicle>(true);
             // ISSUE: reference to a compiler-generated field
             this.__Game_Common_Destroyed_RO_ComponentLookup = state.GetComponentLookup<Destroyed>(true);
@@ -5314,6 +5440,8 @@ public partial class RPFResidentAISystem : GameSystemBase
             // ISSUE: reference to a compiler-generated field
             this.__Game_Net_ConnectionLane_RO_ComponentLookup = state.GetComponentLookup<Game.Net.ConnectionLane>(true);
             // ISSUE: reference to a compiler-generated field
+      		this.__Game_Net_LaneSignal_RO_ComponentLookup = state.GetComponentLookup<Game.Net.LaneSignal>(true);
+      		// ISSUE: reference to a compiler-generated field
             this.__Game_Areas_HangaroundLocation_RO_ComponentLookup = state.GetComponentLookup<HangaroundLocation>(true);
             // ISSUE: reference to a compiler-generated field
             this.__Game_Citizens_Citizen_RO_ComponentLookup = state.GetComponentLookup<Citizen>(true);
@@ -5406,6 +5534,8 @@ public partial class RPFResidentAISystem : GameSystemBase
             // ISSUE: reference to a compiler-generated field
             this.__Game_Routes_ConnectedRoute_RO_BufferLookup = state.GetBufferLookup<ConnectedRoute>(true);
             // ISSUE: reference to a compiler-generated field
+      		this.__Game_Routes_RouteWaypoint_RO_BufferLookup = state.GetBufferLookup<RouteWaypoint>(true);
+      		// ISSUE: reference to a compiler-generated field
             this.__Game_Vehicles_LayoutElement_RO_BufferLookup = state.GetBufferLookup<LayoutElement>(true);
             // ISSUE: reference to a compiler-generated field
             this.__Game_Vehicles_CarNavigationLane_RO_BufferLookup = state.GetBufferLookup<CarNavigationLane>(true);

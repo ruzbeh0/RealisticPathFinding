@@ -44,6 +44,7 @@ namespace RealisticPathFinding.Systems
         private CityStatisticsSystem m_CityStatisticsSystem;
         private CitySystem m_CitySystem;
         private ServiceFeeSystem m_ServiceFeeSystem;
+        private TransportUsageTrackSystem m_TransportUsageTrackSystem;
 
         // Same type-sets vanilla passes into the boarding job
         private ComponentTypeSet m_CurrentLaneTypes;
@@ -59,6 +60,7 @@ namespace RealisticPathFinding.Systems
             m_CityStatisticsSystem = World.GetOrCreateSystemManaged<CityStatisticsSystem>();
             m_CitySystem = World.GetOrCreateSystemManaged<CitySystem>();
             m_ServiceFeeSystem = World.GetOrCreateSystemManaged<ServiceFeeSystem>();
+            m_TransportUsageTrackSystem = base.World.GetOrCreateSystemManaged<TransportUsageTrackSystem>();
 
             m_CurrentLaneTypes = new ComponentTypeSet(new ComponentType[]
 {
@@ -91,6 +93,7 @@ namespace RealisticPathFinding.Systems
             var searchTree = m_ObjectSearchSystem.GetMovingSearchTree(false, out JobHandle treeWriter);
             var statsPW = m_CityStatisticsSystem.GetStatisticsEventQueue(out JobHandle statsWriter).AsParallelWriter();
             var feeQueue = m_ServiceFeeSystem.GetFeeQueue(out JobHandle feeWriter);
+            var transQueue = m_TransportUsageTrackSystem.GetQueue(out JobHandle transWriter);
 
             var addedThisFrame = new NativeParallelHashSet<Entity>(1024, Allocator.TempJob);
 
@@ -127,19 +130,24 @@ namespace RealisticPathFinding.Systems
 
                 m_CurrentLaneTypes = m_CurrentLaneTypes,
                 m_CurrentLaneTypesRelative = m_CurrentLaneTypesRelative,
-
+                m_HumanCurrentLanes = GetComponentLookup<HumanCurrentLane>(true),
                 m_BoardingQueue = m_BoardingQueue,
                 m_SearchTree = searchTree,
+                m_TransportUsageQueue = transQueue,
 
                 // ECB plays back at EndFrame like vanilla
                 m_CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer(),
                 m_StatisticsEventQueue = statsPW,
                 m_FeeQueue = feeQueue,
+                m_Targets = GetComponentLookup<Game.Common.Target>(true),
+                m_Connecteds = GetComponentLookup<Connected>(true),
+                m_Owners = GetComponentLookup<Owner>(true),
+                m_OutsideConnections = GetComponentLookup<Game.Objects.OutsideConnection>(true),
                 m_AddedThisFrame = addedThisFrame
             };
 
             // 4) Combine the producer dep with the three writer deps (tree/stats/fee)
-            var boardingDeps = JobUtils.CombineDependencies(dep, treeWriter, statsWriter, feeWriter);
+            var boardingDeps = JobUtils.CombineDependencies(dep, treeWriter, statsWriter, feeWriter, transWriter);
             var boardingHandle = boardingJob.Schedule(boardingDeps);
             addedThisFrame.Dispose(boardingHandle);
 
@@ -162,6 +170,7 @@ namespace RealisticPathFinding.Systems
 
             // 7) Register writers + ECB playback at EndFrame (vanilla pattern)
             m_CityStatisticsSystem.AddWriter(boardingHandle);
+            m_TransportUsageTrackSystem.AddQueueWriter(boardingHandle);
             m_ObjectSearchSystem.AddMovingSearchTreeWriter(boardingHandle);
             m_ServiceFeeSystem.AddQueueWriter(boardingHandle);
 
