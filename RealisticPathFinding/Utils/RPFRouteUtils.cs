@@ -28,7 +28,7 @@ namespace RealisticPathFinding.Utils
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool IsTrunk(TransportType t) =>
-            t == TransportType.Subway || t == TransportType.Train || t == TransportType.Ship || t == TransportType.Airplane;
+            t == TransportType.Subway || t == TransportType.Train || t == TransportType.Ship || t == TransportType.Airplane || t == TransportType.Ferry;
 
         public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, float feeder_trunk_transfer_penalty, float t2w_timefactor, float waiting_weight, float crowdness_stop_threashold, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
         {
@@ -219,6 +219,7 @@ namespace RealisticPathFinding.Utils
             { TransportType.Tram,     Mod.m_Setting.tram_mode_weight },
             { TransportType.Train,    Mod.m_Setting.train_mode_weight },
             { TransportType.Subway,   Mod.m_Setting.subway_mode_weight },
+            { TransportType.Ferry,   Mod.m_Setting.ferry_mode_weight },
             { TransportType.Ship,     1.00f },
             { TransportType.Airplane, 1.00f },
             { TransportType.Helicopter, 1.00f },

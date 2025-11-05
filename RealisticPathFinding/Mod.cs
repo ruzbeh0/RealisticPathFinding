@@ -64,6 +64,7 @@ namespace RealisticPathFinding
             if(!m_Setting.disable_ped_cost)
             {
                 updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
+                updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianCrosswalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
             }
             
             updateSystem.UpdateAt<RealisticPathFinding.Systems.TaxiStandCrowdingSystem>(SystemUpdatePhase.GameSimulation);

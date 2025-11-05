@@ -11,22 +11,33 @@ using Unity.Mathematics;
 
 namespace RealisticPathFinding.Systems
 {
-    public partial class CarTurnAndHierarchyBiasSystem : GameSystemBase
+    /// <summary>
+    /// Car cost shaping:
+    ///  • Turn penalties based on turn angle (+ optional U-turn bonus seconds)
+    ///  • Road hierarchy bias via density adders (collector/local/very local)
+    ///  • Bus-only lane penalty: extra behavior-time seconds for non-bus vehicles
+    ///
+    /// Uses delta-apply (previous vs desired) so repeated runs don't stack.
+    /// </summary>
+    public sealed partial class CarTurnAndHierarchyBiasSystem : GameSystemBase
     {
-        // Queries
-        EntityQuery _connQ;  // ConnectionLane + Curve
-        EntityQuery _laneQ;  // Lane + PrefabRef
+        // ----------------------- Queries -----------------------
+        EntityQuery _connQ; // connection lanes (for angle sampling if needed)
+        EntityQuery _laneQ; // normal lanes
 
-        // Component lookups (read-only for jobs)
+        // ----------------------- Lookups -----------------------
         ComponentLookup<Curve> _curveLk;
         ComponentLookup<PrefabRef> _prefabLk;
         ComponentLookup<RoadData> _roadDataLk;
+        ComponentLookup<NetLaneData> _netLaneLk; // lane prefab flags (PublicOnly)
 
-        // State caches so we can update deltas when settings change (no double-adding)
-        NativeParallelHashMap<Entity, float> _prevTurnPenaltySec; // per owner entity
-        NativeParallelHashMap<Entity, float> _prevDensityAdd;     // per owner entity
+        // ----------------------- Caches ------------------------
+        NativeParallelHashMap<Entity, float> _prevTurnPenaltySec;
+        NativeParallelHashMap<Entity, float> _prevDensityAdd;
+        NativeParallelHashMap<Entity, float> _prevBusLanePenaltySec;
 
-        public struct CarPathBiasConfig : IComponentData
+        // ----------------------- Config ------------------------
+        struct CarPathBiasConfig : IComponentData
         {
             // TURN PENALTY
             public float BaseTurnPenaltySec; // max penalty for a sharp turn
@@ -38,28 +49,37 @@ namespace RealisticPathFinding.Systems
             public float BiasLocal;
             public float BiasVeryLocal;
 
-            // NEW
-            public float UTurnThresholdDeg; // e.g., 150
-            public float UTurnBonusSec;     // e.g., +5 s
+            // U-turn
+            public float UTurnThresholdDeg;  // e.g., 150
+            public float UTurnBonusSec;      // e.g., +5s
+
+            // Bus-only lane penalty (non-bus vehicles)
+            public float NonBusBusLanePenaltySec;
         }
 
+        // ----------------------- Results -----------------------
+        struct TurnResult { public Entity Owner; public float Seconds; }
+        struct DensityResult { public Entity Owner; public float AddDensity; }
+        struct BusLanePenaltyResult { public Entity Owner; public float PenaltySec; }
+
+        // ----------------------- Lifecycle ---------------------
         protected override void OnCreate()
         {
             base.OnCreate();
 
-            _connQ = GetEntityQuery(new EntityQueryDesc
-            {
-                All = new[] { ComponentType.ReadOnly<Game.Net.ConnectionLane>(), ComponentType.ReadOnly<Curve>() }
-            });
             _laneQ = GetEntityQuery(new EntityQueryDesc
             {
-                All = new[] { ComponentType.ReadOnly<Lane>(), ComponentType.ReadOnly<PrefabRef>() }
+                All = new[]
+                {
+                    ComponentType.ReadOnly<Lane>(),
+                    ComponentType.ReadOnly<PrefabRef>()
+                }
             });
 
-            _prevTurnPenaltySec = new NativeParallelHashMap<Entity, float>(1024, Allocator.Persistent);
-            _prevDensityAdd = new NativeParallelHashMap<Entity, float>(2048, Allocator.Persistent);
+            _prevTurnPenaltySec = new NativeParallelHashMap<Entity, float>(256, Allocator.Persistent);
+            _prevDensityAdd = new NativeParallelHashMap<Entity, float>(256, Allocator.Persistent);
+            _prevBusLanePenaltySec = new NativeParallelHashMap<Entity, float>(256, Allocator.Persistent);
 
-            RequireForUpdate(_connQ);
             RequireForUpdate(_laneQ);
         }
 
@@ -67,22 +87,31 @@ namespace RealisticPathFinding.Systems
         {
             if (_prevTurnPenaltySec.IsCreated) _prevTurnPenaltySec.Dispose();
             if (_prevDensityAdd.IsCreated) _prevDensityAdd.Dispose();
+            if (_prevBusLanePenaltySec.IsCreated) _prevBusLanePenaltySec.Dispose();
             base.OnDestroy();
         }
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // Run infrequently; we compute deltas so repeated runs won’t accumulate
-            return 262144/32; // once per in-game day
+            // Infrequent; we delta-apply so it won't stack
+            return 262144 / 32;
         }
 
-        // Update pipeline: jobs compute desired values -> main thread applies deltas to the graph
+        // ----------------------- Update ------------------------
         protected override void OnUpdate()
         {
+            // Refresh lookups
             _curveLk = GetComponentLookup<Curve>(true);
             _prefabLk = GetComponentLookup<PrefabRef>(true);
             _roadDataLk = GetComponentLookup<RoadData>(true);
+            _netLaneLk = GetComponentLookup<NetLaneData>(true);
 
+            _curveLk.Update(this);
+            _prefabLk.Update(this);
+            _roadDataLk.Update(this);
+            _netLaneLk.Update(this);
+
+            // Build config from settings (respect your existing field names)
             var s = Mod.m_Setting;
             var cfg = SystemAPI.HasSingleton<CarPathBiasConfig>()
                 ? SystemAPI.GetSingleton<CarPathBiasConfig>()
@@ -96,154 +125,151 @@ namespace RealisticPathFinding.Systems
                     BiasVeryLocal = s?.alleyway_bias ?? 0.15f,
                     UTurnThresholdDeg = s?.uturn_threshold_deg ?? 150f,
                     UTurnBonusSec = s?.uturn_sec_penalty ?? 5f,
+                    NonBusBusLanePenaltySec = math.max(0f, s.nonbus_buslane_penalty_sec)
                 };
 
-
-            // Allocate output buffers sized to queries
-            int connN = _connQ.CalculateEntityCount();
             int laneN = _laneQ.CalculateEntityCount();
-            var turnResults = new NativeList<TurnResult>(math.max(1, connN), Allocator.TempJob);
+
+            var turnResults = new NativeList<TurnResult>(math.max(1, laneN), Allocator.TempJob);
             var densResults = new NativeList<DensityResult>(math.max(1, laneN), Allocator.TempJob);
+            var busLaneResults = new NativeList<BusLanePenaltyResult>(math.max(1, laneN), Allocator.TempJob);
 
-            // ensure no growth inside jobs
-            turnResults.Capacity = math.max(turnResults.Capacity, connN);
-            densResults.Capacity = math.max(densResults.Capacity, laneN);
-
-
-            // Schedule Burst jobs
-            new TurnScanJob
-            {
-                CurveLk = _curveLk,
-                BaseTurnPenaltySec = cfg.BaseTurnPenaltySec,
-                MinTurnAngleDeg = cfg.MinTurnAngleDeg,
-                MaxTurnAngleDeg = cfg.MaxTurnAngleDeg,
-                UTurnThresholdDeg = cfg.UTurnThresholdDeg,
-                UTurnBonusSec = cfg.UTurnBonusSec,
-                Results = turnResults.AsParallelWriter()
-            }.ScheduleParallel(_connQ, Dependency).Complete();
-
+            // 1) Hierarchy bias + Bus-only detection
             new LaneScanJob
             {
                 PrefabLk = _prefabLk,
                 RoadDataLk = _roadDataLk,
+                NetLaneLk = _netLaneLk,
+
                 BiasCollector = cfg.BiasCollector,
                 BiasLocal = cfg.BiasLocal,
                 BiasVeryLocal = cfg.BiasVeryLocal,
-                Results = densResults.AsParallelWriter()
+
+                NonBusBusLanePenaltySec = cfg.NonBusBusLanePenaltySec,
+
+                Results = densResults.AsParallelWriter(),
+                BusLaneResults = busLaneResults.AsParallelWriter()
             }.ScheduleParallel(_laneQ, default).Complete();
 
-            // MAIN THREAD: commit deltas to the path graph
+            // 2) Turn scan (angle → seconds)
+            new TurnScanJob
+            {
+                CurveLk = _curveLk,
+                BaseTurnPenaltySec = cfg.BaseTurnPenaltySec,
+                MinTurnDeg = cfg.MinTurnAngleDeg,
+                MaxTurnDeg = cfg.MaxTurnAngleDeg,
+                UTurnThresholdDeg = cfg.UTurnThresholdDeg,
+                UTurnBonusSec = cfg.UTurnBonusSec,
+                TurnResults = turnResults.AsParallelWriter()
+            }.ScheduleParallel(_laneQ, default).Complete();
+
+            // 3) MAIN THREAD: commit deltas to pathfind data
             var pqs = World.GetOrCreateSystemManaged<PathfindQueueSystem>();
             var data = pqs.GetDataContainer(out var dep); dep.Complete();
 
-            // 1) Turn penalties (behavior seconds)
+            // A) Turn seconds (behavior-time channel)
             for (int i = 0; i < turnResults.Length; i++)
             {
                 var r = turnResults[i];
-                if (!TryGetEdge(data, r.Owner, out var eid))
-                    continue;
+                if (!TryGetEdge(data, r.Owner, out var eid)) continue;
 
                 float prev = _prevTurnPenaltySec.TryGetValue(r.Owner, out var p) ? p : 0f;
-                float delta = r.PenaltySec - prev;
-                if (math.abs(delta) >= 0.01f)
-                {
-                    ref var costs = ref data.SetCosts(eid); // .m_Value.x/y/z layout is internal; y holds behavior time
-                    costs.m_Value.y += delta;
-                    _prevTurnPenaltySec[r.Owner] = r.PenaltySec;
-                }
+                float delta = r.Seconds - prev;
+                if (math.abs(delta) < 0.01f) continue;
+
+                ref var costs = ref data.SetCosts(eid);
+                costs.m_Value.y += delta; // behavior-time
+                _prevTurnPenaltySec[r.Owner] = r.Seconds;
             }
 
-            // 2) Hierarchy bias (density add)
+            // B) Bus-only lane penalty (behavior-time channel for car profile)
+            for (int i = 0; i < busLaneResults.Length; i++)
+            {
+                var r = busLaneResults[i];
+                if (!TryGetEdge(data, r.Owner, out var eid)) continue;
+
+                float prev = _prevBusLanePenaltySec.TryGetValue(r.Owner, out var p) ? p : 0f;
+                float delta = r.PenaltySec - prev;
+                if (math.abs(delta) < 0.01f) continue;
+
+                ref var costs = ref data.SetCosts(eid);
+                costs.m_Value.y += delta; // behavior-time (cars)
+                _prevBusLanePenaltySec[r.Owner] = r.PenaltySec;
+            }
+
+            // C) Hierarchy density adders
             for (int i = 0; i < densResults.Length; i++)
             {
                 var r = densResults[i];
-                if (!TryGetEdge(data, r.Owner, out var eid))
-                    continue;
+                if (!TryGetEdge(data, r.Owner, out var eid)) continue;
 
                 float prev = _prevDensityAdd.TryGetValue(r.Owner, out var p) ? p : 0f;
                 float delta = r.AddDensity - prev;
-                if (math.abs(delta) >= 1e-4f)
-                {
-                    ref float density = ref data.SetDensity(eid);
-                    density += delta;
-                    _prevDensityAdd[r.Owner] = r.AddDensity;
-                }
+                if (math.abs(delta) < 1e-4f) continue;
+
+                ref float density = ref data.SetDensity(eid);
+                density += delta;
+                _prevDensityAdd[r.Owner] = r.AddDensity;
             }
 
-            // Let the queue know we touched the data this frame
+            // Let pathfinding pick up the changes
             pqs.AddDataReader(default);
 
-            // Dispose temp lists
+            // Dispose temps
             turnResults.Dispose();
             densResults.Dispose();
+            busLaneResults.Dispose();
         }
 
-        static bool TryGetEdge(NativePathfindData data, Entity owner, out EdgeID id)
+        // ----------------------- Helpers -----------------------
+        static bool TryGetEdge(NativePathfindData d, Entity owner, out EdgeID id)
         {
-            if (data.GetEdge(owner, out id)) return true;
-            if (data.GetSecondaryEdge(owner, out id)) return true;
+            if (d.GetEdge(owner, out id)) return true;
+            if (d.GetSecondaryEdge(owner, out id)) return true;
             id = default; return false;
         }
 
-        // ---------- Burst jobs ----------
-
-        struct TurnResult
-        {
-            public Entity Owner;
-            public float PenaltySec;
-        }
-
+        // ----------------------- Jobs --------------------------
         [BurstCompile]
         partial struct TurnScanJob : IJobEntity
         {
             [ReadOnly] public ComponentLookup<Curve> CurveLk;
-            public float BaseTurnPenaltySec, MinTurnAngleDeg, MaxTurnAngleDeg, UTurnThresholdDeg, UTurnBonusSec;
 
-            [WriteOnly] public NativeList<TurnResult>.ParallelWriter Results;
+            public float BaseTurnPenaltySec;
+            public float MinTurnDeg;
+            public float MaxTurnDeg;
 
-            void Execute(Entity e, in Game.Net.ConnectionLane conn)
+            public float UTurnThresholdDeg;
+            public float UTurnBonusSec;
+
+            [WriteOnly] public NativeList<TurnResult>.ParallelWriter TurnResults;
+
+            public void Execute(Entity e, in Lane lane, in PrefabRef pr)
             {
-                // only road turns
-                if ((conn.m_Flags & ConnectionLaneFlags.Road) == 0) return;
-                if (!CurveLk.HasComponent(e)) return;
+                float angleDeg = 0f;
 
-                var bz = CurveLk[e].m_Bezier; // Bezier4x3 (a,b,c,d)
+                if (CurveLk.HasComponent(e))
+                {
+                    // Approximate turn angle from Bezier tangents (matches other systems using m_Bezier)
+                    var b = CurveLk[e].m_Bezier;
+                    float3 t0 = math.normalize(b.b - b.a);
+                    float3 t1 = math.normalize(b.c - b.d);
+                    float dot = math.clamp(math.dot(t0, -t1), -1f, 1f);
+                    angleDeg = math.degrees(math.acos(dot));
+                }
 
-                float3 p0 = Eval(bz, 0.00f);
-                float3 p1 = Eval(bz, 0.10f);
-                float3 q1 = Eval(bz, 0.90f);
-                float3 q2 = Eval(bz, 1.00f);
+                float secs = 0f;
+                if (angleDeg > MinTurnDeg)
+                {
+                    float t = math.saturate((angleDeg - MinTurnDeg) / math.max(1e-3f, (MaxTurnDeg - MinTurnDeg)));
+                    secs = t * BaseTurnPenaltySec;
+                }
 
-                float3 dirIn = math.normalizesafe(p1 - p0);
-                float3 dirOut = math.normalizesafe(q2 - q1);
+                if (angleDeg >= UTurnThresholdDeg && UTurnBonusSec > 0f)
+                    secs += UTurnBonusSec;
 
-                float dot = math.clamp(math.dot(dirIn, dirOut), -1f, 1f);
-                float turnDeg = math.degrees(math.acos(dot));
-
-                float t = math.saturate((turnDeg - MinTurnAngleDeg) / math.max(1f, (MaxTurnAngleDeg - MinTurnAngleDeg)));
-
-                float penalty = BaseTurnPenaltySec * t;
-
-                if (turnDeg >= UTurnThresholdDeg)
-                    penalty += UTurnBonusSec;
-
-                if (penalty > 0.001f)
-                    Results.AddNoResize(new TurnResult { Owner = e, PenaltySec = penalty });
-                else
-                    Results.AddNoResize(new TurnResult { Owner = e, PenaltySec = 0f });
+                TurnResults.AddNoResize(new TurnResult { Owner = e, Seconds = secs });
             }
-
-            static float3 Eval(Bezier4x3 b, float t)
-            {
-                float u = 1f - t;
-                return (u * u * u) * b.a + 3f * (u * u * t) * b.b + 3f * (u * t * t) * b.c + (t * t * t) * b.d;
-            }
-        }
-
-        struct DensityResult
-        {
-            public Entity Owner;
-            public float AddDensity;
         }
 
         [BurstCompile]
@@ -251,34 +277,49 @@ namespace RealisticPathFinding.Systems
         {
             [ReadOnly] public ComponentLookup<PrefabRef> PrefabLk;
             [ReadOnly] public ComponentLookup<RoadData> RoadDataLk;
+            [ReadOnly] public ComponentLookup<NetLaneData> NetLaneLk;
 
             public float BiasCollector, BiasLocal, BiasVeryLocal;
 
+            public float NonBusBusLanePenaltySec;
+
             [WriteOnly] public NativeList<DensityResult>.ParallelWriter Results;
+            [WriteOnly] public NativeList<BusLanePenaltyResult>.ParallelWriter BusLaneResults;
 
-            void Execute(Entity e, in Lane lane, in PrefabRef pr)
+            public void Execute(Entity e, in Lane lane, in PrefabRef pr)
             {
-                var prefab = pr.m_Prefab;
-                if (prefab == Entity.Null || !RoadDataLk.HasComponent(prefab))
-                    return;
-
-                var rd = RoadDataLk[prefab];
-                // Favor highways by not adding bias (UseHighwayRules flag)
-                bool isHighway = (rd.m_Flags & Game.Prefabs.RoadFlags.UseHighwayRules) != 0;
-
+                // ----- Hierarchy bias (skip highways) -----
                 float add = 0f;
-                if (!isHighway)
+                var prefab = pr.m_Prefab;
+                if (prefab != Entity.Null && RoadDataLk.HasComponent(prefab))
                 {
-                    // Speed thresholds in m/s (≈60 km/h, 40 km/h)
-                    if (rd.m_SpeedLimit >= 16.7f) add = BiasCollector;   // arterials/collectors
-                    else if (rd.m_SpeedLimit >= 11.1f) add = BiasLocal;       // locals
-                    else add = BiasVeryLocal;   // very local/alleys
+                    var rd = RoadDataLk[prefab];
+                    bool isHighway = (rd.m_Flags & Game.Prefabs.RoadFlags.UseHighwayRules) != 0;
+
+                    if (!isHighway)
+                    {
+                        // Speed thresholds in m/s (≈60km/h, 40km/h)
+                        if (rd.m_SpeedLimit >= 16.7f) add = BiasCollector;
+                        else if (rd.m_SpeedLimit >= 11.1f) add = BiasLocal;
+                        else add = BiasVeryLocal;
+                    }
                 }
 
-                if (add > 0f)
-                    Results.AddNoResize(new DensityResult { Owner = e, AddDensity = add });
-                else
-                    Results.AddNoResize(new DensityResult { Owner = e, AddDensity = 0f });
+                Results.AddNoResize(new DensityResult { Owner = e, AddDensity = add });
+
+                // ----- Bus-only lane penalty (PublicOnly on lane prefab) -----
+                if (NonBusBusLanePenaltySec > 0f && prefab != Entity.Null && NetLaneLk.HasComponent(prefab))
+                {
+                    var nd = NetLaneLk[prefab];
+                    if ((nd.m_Flags & Game.Prefabs.LaneFlags.PublicOnly) != 0)
+                    {
+                        BusLaneResults.AddNoResize(new BusLanePenaltyResult
+                        {
+                            Owner = e,
+                            PenaltySec = NonBusBusLanePenaltySec
+                        });
+                    }
+                }
             }
         }
     }

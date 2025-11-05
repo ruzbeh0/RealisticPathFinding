@@ -2,16 +2,20 @@
 using Colossal.IO.AssetDatabase;
 using Game.Modding;
 using Game.Settings;
+using Game.Tools;
 using Game.UI;
 using Game.UI.Widgets;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
+using System.Reflection.Emit;
+using Unity.Entities;
 
 namespace RealisticPathFinding
 {
     [FileLocation("ModsSettings\\" + nameof(RealisticPathFinding) + "\\" + nameof(RealisticPathFinding))]
-    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, TaxiGroup, PedestrianGroup, LongDistanceGroup, OtherGroup)]
-    [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, PedestrianGroup, LongDistanceGroup)]
+    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, TaxiGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup, OtherGroup)]
+    [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup)]
     public class Setting : ModSetting
     {
         public const string PedestriansSection = "Pedestrians";
@@ -20,9 +24,11 @@ namespace RealisticPathFinding
         public const string VehicleSection = "Vehicles";
         public const string WaitingTimeGroup = "WaitingTine";
         public const string ModeWeightGroup = "ModeWeight";
+        public const string BusLaneGroup = "BusLaneGroup";
         public const string PedestrianGroup = "Pedestrians";
         public const string TaxiGroup = "Taxi";
         public const string LongDistanceGroup = "LongDistanceGroup";
+        public const string PedestrianCrossingGroup = "PedestrianCrossingGroup";
         public const string TurnPenaltyGroup = "TurnPenalty";
         public const string RoadBiasGroup = "RoadBias";
         public const string CongestionGroup = "Congestion";
@@ -77,6 +83,9 @@ namespace RealisticPathFinding
             disable_ped_cost = false;
             taxi_passengers_waiting_threashold = 7f;
             taxi_fare_increase = 0.3f;
+            ped_crosswalk_factor = 0.7f;
+            ped_unsafe_crosswalk_factor = 1f;
+            ferry_mode_weight = 1f;
         }
 
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
@@ -92,7 +101,7 @@ namespace RealisticPathFinding
         [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
         public float max_turn_agle_deg { get; set; }
 
-        [SettingsUISlider(min = 0, max = 10, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 0, max = 100, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
         public float base_turn_penalty { get; set; }
 
@@ -100,7 +109,7 @@ namespace RealisticPathFinding
         [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
         public float uturn_threshold_deg { get; set; }
 
-        [SettingsUISlider(min = 0, max = 10, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 0, max = 500, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
         public float uturn_sec_penalty { get; set; }
 
@@ -156,6 +165,14 @@ namespace RealisticPathFinding
         [SettingsUISection(TransitSection, ModeWeightGroup)]
         public float train_mode_weight { get; set; }
 
+        [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(TransitSection, ModeWeightGroup)]
+        public float ferry_mode_weight { get; set; }
+
+        [SettingsUISlider(min = 0f, max = 30f, step = 0.5f)]
+        [SettingsUISection(TransitSection, BusLaneGroup)]
+        public float nonbus_buslane_penalty_sec { get; set; } = 6f;
+
         [SettingsUISlider(min = 0, max = 20, step = 1, scalarMultiplier = 1, unit = Unit.kInteger)]
         [SettingsUISection(TaxiSection, TaxiGroup)]
         public float taxi_passengers_waiting_threashold { get; set; }
@@ -200,7 +217,16 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, LongDistanceGroup)]
         public float walk_long_min_mult { get; set; }
 
-        [SettingsUISlider(min = 0.05f, max = 0.5f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISlider(min = 0.1f, max = 5f, step = 0.05f)]
+        [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
+        public float ped_crosswalk_factor { get; set; }
+
+        [SettingsUISlider(min = 0.1f, max = 5f, step = 0.05f)]
+        [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
+        public float ped_unsafe_crosswalk_factor { get; set; }
+
+
+        [SettingsUISlider(min = 0.05f, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
         public float cong_alpha { get; set; }
 
@@ -223,6 +249,7 @@ namespace RealisticPathFinding
         [SettingsUISlider(min = 0f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
         public float cong_min_sample_sec { get; set; }
+
 
         [SettingsUIButton]
         [SettingsUISection(OtherSection, OtherGroup)]
@@ -271,9 +298,11 @@ namespace RealisticPathFinding
             // New groups inside the Vehicles section
             { m_Setting.GetOptionGroupLocaleID(Setting.TurnPenaltyGroup), "Turn penalties" },
             { m_Setting.GetOptionGroupLocaleID(Setting.RoadBiasGroup),    "Road hierarchy bias" },
+            { m_Setting.GetOptionGroupLocaleID(Setting.BusLaneGroup),    "Bus Lanes" },
 
             // Group (under Pedestrians)
             { m_Setting.GetOptionGroupLocaleID(Setting.LongDistanceGroup), "Long-distance walking" },
+            { m_Setting.GetOptionGroupLocaleID(Setting.PedestrianCrossingGroup), "Crossings" },
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.car_mode_weight)), "Car perceived-time weight" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.car_mode_weight)), "Multiplier on in-vehicle car time used for route choice. 1.0 = neutral; less than 1.0 makes driving feel faster, more than 1.0 makes it feel slower." },
@@ -304,7 +333,8 @@ namespace RealisticPathFinding
                       "Crowding threshold (load ratio)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_stop_threashold)),
                      "Applies crowding delay when the number of people at a stop exceeds this fraction of vehicle capacity (0–1). Example: 0.5 means crowding begins when the stop is half a vehicle’s capacity." },
-
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)), "Non-bus on bus-only lane penalty (s)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)),  "Extra behavior time per bus-only segment for non-bus vehicles. 0 = off." },
 
             // ============================
             // Transit → Mode weights group
@@ -328,6 +358,11 @@ namespace RealisticPathFinding
               "Train in-vehicle time weight" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.train_mode_weight)),
               "Multiplier applied to regional/commuter rail in-vehicle time." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.ferry_mode_weight)),
+              "Ferry in-vehicle time weight" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.ferry_mode_weight)),
+              "Multiplier applied to Ferry/metro in-vehicle time." },
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Feeder→Trunk transfer penalty" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Multiplier applied to the wait time when transferring from a feeder mode (bus/tram) to a trunk mode (metro/train/ship/plane). Use 1.0 for no extra penalty; values < 1.0 reduce hassle, > 1.0 increase it." },
@@ -403,6 +438,18 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.walk_long_ramp_m)), "Ramp length (m)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.walk_long_ramp_m)),
               "Over the next meters after the comfort distance, the multiplier ramps down to the minimum. Full effect at comfort + ramp." },
+
+            // ----- Options: Crosswalk factor -----
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.ped_crosswalk_factor)),
+              "Crosswalk cost factor" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.ped_crosswalk_factor)),
+              "Multiplier applied to pedestrian crosswalk pathfind cost. 1.0 = no change." },
+            
+            // ----- Options: Unsafe crosswalk factor -----
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.ped_unsafe_crosswalk_factor)),
+              "Unsafe crosswalk cost factor" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.ped_unsafe_crosswalk_factor)),
+              "Multiplier applied to pedestrian unsafe crosswalk cost. 1.0 = no change." },
 
             // Minimum multiplier
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.walk_long_min_mult)), "Minimum speed multiplier" },
