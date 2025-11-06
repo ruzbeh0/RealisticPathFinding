@@ -86,6 +86,7 @@ namespace RealisticPathFinding
             ped_crosswalk_factor = 0.7f;
             ped_unsafe_crosswalk_factor = 1f;
             ferry_mode_weight = 1f;
+            nonbus_buslane_penalty_sec = 30f;
         }
 
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
@@ -169,9 +170,9 @@ namespace RealisticPathFinding
         [SettingsUISection(TransitSection, ModeWeightGroup)]
         public float ferry_mode_weight { get; set; }
 
-        [SettingsUISlider(min = 0f, max = 30f, step = 0.5f)]
+        [SettingsUISlider(min = 0f, max = 300f, step = 1f)]
         [SettingsUISection(TransitSection, BusLaneGroup)]
-        public float nonbus_buslane_penalty_sec { get; set; } = 6f;
+        public float nonbus_buslane_penalty_sec { get; set; }
 
         [SettingsUISlider(min = 0, max = 20, step = 1, scalarMultiplier = 1, unit = Unit.kInteger)]
         [SettingsUISection(TaxiSection, TaxiGroup)]

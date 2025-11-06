@@ -34,8 +34,6 @@ namespace RealisticPathFinding.Systems
         // ----------------------- Caches ------------------------
         NativeParallelHashMap<Entity, float> _prevTurnPenaltySec;
         NativeParallelHashMap<Entity, float> _prevDensityAdd;
-        NativeParallelHashMap<Entity, float> _prevBusLanePenaltySec;
-
         // ----------------------- Config ------------------------
         struct CarPathBiasConfig : IComponentData
         {
@@ -52,15 +50,11 @@ namespace RealisticPathFinding.Systems
             // U-turn
             public float UTurnThresholdDeg;  // e.g., 150
             public float UTurnBonusSec;      // e.g., +5s
-
-            // Bus-only lane penalty (non-bus vehicles)
-            public float NonBusBusLanePenaltySec;
         }
 
         // ----------------------- Results -----------------------
         struct TurnResult { public Entity Owner; public float Seconds; }
         struct DensityResult { public Entity Owner; public float AddDensity; }
-        struct BusLanePenaltyResult { public Entity Owner; public float PenaltySec; }
 
         // ----------------------- Lifecycle ---------------------
         protected override void OnCreate()
@@ -78,7 +72,6 @@ namespace RealisticPathFinding.Systems
 
             _prevTurnPenaltySec = new NativeParallelHashMap<Entity, float>(256, Allocator.Persistent);
             _prevDensityAdd = new NativeParallelHashMap<Entity, float>(256, Allocator.Persistent);
-            _prevBusLanePenaltySec = new NativeParallelHashMap<Entity, float>(256, Allocator.Persistent);
 
             RequireForUpdate(_laneQ);
         }
@@ -87,7 +80,6 @@ namespace RealisticPathFinding.Systems
         {
             if (_prevTurnPenaltySec.IsCreated) _prevTurnPenaltySec.Dispose();
             if (_prevDensityAdd.IsCreated) _prevDensityAdd.Dispose();
-            if (_prevBusLanePenaltySec.IsCreated) _prevBusLanePenaltySec.Dispose();
             base.OnDestroy();
         }
 
@@ -125,14 +117,12 @@ namespace RealisticPathFinding.Systems
                     BiasVeryLocal = s?.alleyway_bias ?? 0.15f,
                     UTurnThresholdDeg = s?.uturn_threshold_deg ?? 150f,
                     UTurnBonusSec = s?.uturn_sec_penalty ?? 5f,
-                    NonBusBusLanePenaltySec = math.max(0f, s.nonbus_buslane_penalty_sec)
                 };
 
             int laneN = _laneQ.CalculateEntityCount();
 
             var turnResults = new NativeList<TurnResult>(math.max(1, laneN), Allocator.TempJob);
             var densResults = new NativeList<DensityResult>(math.max(1, laneN), Allocator.TempJob);
-            var busLaneResults = new NativeList<BusLanePenaltyResult>(math.max(1, laneN), Allocator.TempJob);
 
             // 1) Hierarchy bias + Bus-only detection
             new LaneScanJob
@@ -145,10 +135,7 @@ namespace RealisticPathFinding.Systems
                 BiasLocal = cfg.BiasLocal,
                 BiasVeryLocal = cfg.BiasVeryLocal,
 
-                NonBusBusLanePenaltySec = cfg.NonBusBusLanePenaltySec,
-
                 Results = densResults.AsParallelWriter(),
-                BusLaneResults = busLaneResults.AsParallelWriter()
             }.ScheduleParallel(_laneQ, default).Complete();
 
             // 2) Turn scan (angle → seconds)
@@ -182,21 +169,6 @@ namespace RealisticPathFinding.Systems
                 _prevTurnPenaltySec[r.Owner] = r.Seconds;
             }
 
-            // B) Bus-only lane penalty (behavior-time channel for car profile)
-            for (int i = 0; i < busLaneResults.Length; i++)
-            {
-                var r = busLaneResults[i];
-                if (!TryGetEdge(data, r.Owner, out var eid)) continue;
-
-                float prev = _prevBusLanePenaltySec.TryGetValue(r.Owner, out var p) ? p : 0f;
-                float delta = r.PenaltySec - prev;
-                if (math.abs(delta) < 0.01f) continue;
-
-                ref var costs = ref data.SetCosts(eid);
-                costs.m_Value.y += delta; // behavior-time (cars)
-                _prevBusLanePenaltySec[r.Owner] = r.PenaltySec;
-            }
-
             // C) Hierarchy density adders
             for (int i = 0; i < densResults.Length; i++)
             {
@@ -218,7 +190,6 @@ namespace RealisticPathFinding.Systems
             // Dispose temps
             turnResults.Dispose();
             densResults.Dispose();
-            busLaneResults.Dispose();
         }
 
         // ----------------------- Helpers -----------------------
@@ -281,10 +252,7 @@ namespace RealisticPathFinding.Systems
 
             public float BiasCollector, BiasLocal, BiasVeryLocal;
 
-            public float NonBusBusLanePenaltySec;
-
             [WriteOnly] public NativeList<DensityResult>.ParallelWriter Results;
-            [WriteOnly] public NativeList<BusLanePenaltyResult>.ParallelWriter BusLaneResults;
 
             public void Execute(Entity e, in Lane lane, in PrefabRef pr)
             {
@@ -306,20 +274,6 @@ namespace RealisticPathFinding.Systems
                 }
 
                 Results.AddNoResize(new DensityResult { Owner = e, AddDensity = add });
-
-                // ----- Bus-only lane penalty (PublicOnly on lane prefab) -----
-                if (NonBusBusLanePenaltySec > 0f && prefab != Entity.Null && NetLaneLk.HasComponent(prefab))
-                {
-                    var nd = NetLaneLk[prefab];
-                    if ((nd.m_Flags & Game.Prefabs.LaneFlags.PublicOnly) != 0)
-                    {
-                        BusLaneResults.AddNoResize(new BusLanePenaltyResult
-                        {
-                            Owner = e,
-                            PenaltySec = NonBusBusLanePenaltySec
-                        });
-                    }
-                }
             }
         }
     }
