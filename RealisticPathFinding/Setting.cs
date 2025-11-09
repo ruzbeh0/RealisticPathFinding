@@ -75,10 +75,10 @@ namespace RealisticPathFinding
             walk_long_min_mult = 0.3f;
             ped_walk_time_factor = 5.0f;
             cong_min_sample_sec = 0.2f;
-            cong_alpha = 0.2f;
+            cong_alpha = 0.15f;
             cong_min_push_sec = 0.5f;
-            cong_max_ratio = 3f;
-            cong_max_density = 0.5f;
+            cong_max_ratio = 1.8f;
+            cong_max_density = 0.25f;
             cong_min_ff_mps = 1f;
             disable_ped_cost = false;
             taxi_passengers_waiting_threashold = 7f;
@@ -87,6 +87,7 @@ namespace RealisticPathFinding
             ped_unsafe_crosswalk_factor = 1f;
             ferry_mode_weight = 1f;
             nonbus_buslane_penalty_sec = 30f;
+            choice_tau_sec = 4f;
         }
 
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
@@ -250,6 +251,12 @@ namespace RealisticPathFinding
         [SettingsUISlider(min = 0f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, CongestionGroup)]
         public float cong_min_sample_sec { get; set; }
+
+        // --- Stochastic route choice (cars) ---
+
+        [SettingsUISlider(min = 0f, max = 30f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISection(OtherSection, OtherGroup)]
+        public float choice_tau_sec { get; set; }   // "temperature" in seconds
 
 
         [SettingsUIButton]
@@ -493,6 +500,10 @@ namespace RealisticPathFinding
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.Button)), "Reset Settings" },
                 { m_Setting.GetOptionDescLocaleID(nameof(Setting.Button)), $"Reset settings to default values" },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.choice_tau_sec)), "Stochastic choice temperature (s)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.choice_tau_sec)), "One value used for all modes. Higher = more randomness (broader splits among near-equal routes); lower = more deterministic." },
+
         };
 
             return dict;

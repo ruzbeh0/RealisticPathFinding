@@ -30,6 +30,40 @@ namespace RealisticPathFinding.Utils
         static bool IsTrunk(TransportType t) =>
             t == TransportType.Subway || t == TransportType.Train || t == TransportType.Ship || t == TransportType.Airplane || t == TransportType.Ferry;
 
+        // Gumbel(0,1) from a deterministic uint seed (no allocations)
+        // u in (0,1); g = -log(-log(u))
+        public static float SampleGumbel01(uint seed)
+        {
+            var rng = new Unity.Mathematics.Random(seed == 0 ? 1u : seed);
+            // avoid 0/1 exactly
+            float u = math.clamp(rng.NextFloat(), 1e-6f, 1f - 1e-6f);
+            return -math.log(-math.log(u));
+        }
+
+        // Build a stable seed from (citizen entity, pathOwner/path id, user salt)
+        public static uint MakeChoiceSeed(Entity citizen, ulong pathId, int userSalt)
+        {
+            // Mix entity index/version, path id (or other trip token), and user salt
+            uint a = (uint)citizen.Index;
+            uint b = (uint)citizen.Version;
+            uint c = (uint)(pathId ^ ((ulong)userSalt << 32) ^ (ulong)userSalt);
+            // xorshift-ish mix
+            uint x = a * 747796405u ^ b * 2891336453u ^ c * 1402946737u;
+            x ^= x >> 16; x *= 2246822519u; x ^= x >> 13; x *= 3266489917u; x ^= x >> 16;
+            return x == 0 ? 1u : x;
+        }
+
+        // Map a Gumbel draw (seconds) into a gentle multiplicative weight for car cost.
+        // We convert additive time bias (eps seconds) to a multiplicative factor on car cost:
+        // factor ≈ exp(eps / scale). Pick 'scale' near typical route time (e.g. 300s = 5min).
+        public static float CarWeightFromGumbel(float epsSeconds, float typicalSecs = 300f)
+        {
+            // For small x, exp(x) ≈ 1+x → a few % swing for a few seconds of bias.
+            float x = math.saturate(math.abs(epsSeconds)) * math.sign(epsSeconds) / math.max(30f, typicalSecs);
+            // Clamp to keep weights tame
+            return math.clamp(math.exp(x), 0.85f, 1.15f);
+        }
+
         public static void StripTransportSegments<TTransportEstimateBuffer>(ref Unity.Mathematics.Random random, int length, DynamicBuffer<PathElement> path, ComponentLookup<Connected> connectedData, ComponentLookup<BoardingVehicle> boardingVehicleData, ComponentLookup<Owner> ownerData, ComponentLookup<Lane> laneData, ComponentLookup<Game.Net.ConnectionLane> connectionLaneData, ComponentLookup<Curve> curveData, ComponentLookup<PrefabRef> prefabRefData, ComponentLookup<TransportStopData> prefabTransportStopData, BufferLookup<Game.Net.SubLane> subLanes, BufferLookup<Game.Areas.Node> areaNodes, BufferLookup<Triangle> areaTriangles, ComponentLookup<Game.Routes.WaitingPassengers> waitingPassengersData, ComponentLookup<Game.Routes.CurrentRoute> currentRouteData, ComponentLookup<Game.Prefabs.PublicTransportVehicleData> publicTransportVehicleData, float kCrowd, float schedule_factor, float transfer_penalty, float feeder_trunk_transfer_penalty, float t2w_timefactor, float waiting_weight, float crowdness_stop_threashold, TTransportEstimateBuffer transportEstimateBuffer) where TTransportEstimateBuffer : unmanaged, ITransportEstimateBuffer
         {
             int num = 0;

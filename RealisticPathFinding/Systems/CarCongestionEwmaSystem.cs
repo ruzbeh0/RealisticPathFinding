@@ -199,7 +199,10 @@ namespace RealisticPathFinding.Systems
 
                 float sampleAvg = a.Sum / math.max(1, a.Cnt);
                 float old = t.EwmaSec;
-                float ewma = cfg.Alpha * sampleAvg + (1f - cfg.Alpha) * old;
+                float alphaUp = cfg.Alpha;       
+                float alphaDown = cfg.Alpha * 0.7f; // slower recovery
+                float alpha = (sampleAvg > old) ? alphaUp : alphaDown;
+                float ewma = alpha * sampleAvg + (1f - cfg.Alpha) * old;
 
                 if (math.abs(ewma - old) < cfg.UpdateThresholdSec)
                 {
@@ -232,6 +235,8 @@ namespace RealisticPathFinding.Systems
                 {
                     float prev = _lastDensityAdd.TryGetValue(lane, out var p) ? p : 0f;
                     float delta = densityAdd - prev;
+                    float maxStep = 0.08f;
+                    delta = math.clamp(delta, -maxStep, maxStep);
                     if (math.abs(delta) >= 1e-4f)
                     {
                         ref float density = ref data.SetDensity(eid);

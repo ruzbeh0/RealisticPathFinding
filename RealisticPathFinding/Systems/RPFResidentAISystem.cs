@@ -282,6 +282,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             ComfortMeters = comfort,
             RampMeters = ramp,
             MinSpeedMult = minMult,
+            choice_tau = Mod.m_Setting.choice_tau_sec,
             t2w_timefactor = Time2WorkInterop.GetFactor(),
             waiting_weight = Mod.m_Setting.waiting_time_factor,
             m_PathfindQueue = this.m_PathfindSetupSystem.GetQueue((object)this, 64 /*0x40*/).AsParallelWriter(),
@@ -763,6 +764,7 @@ public partial class RPFResidentAISystem : GameSystemBase
         public float ComfortMeters;
         public float RampMeters;
         public float MinSpeedMult;
+        public float choice_tau;
 
         public void Execute(
           in ArchetypeChunk chunk,
@@ -3842,13 +3844,10 @@ public partial class RPFResidentAISystem : GameSystemBase
           ref Game.Common.Target target,
           ref Divert divert)
         {
-            // ISSUE: reference to a compiler-generated field
             CreatureData creatureData = this.m_PrefabCreatureData[prefabRef.m_Prefab];
-            // ISSUE: reference to a compiler-generated field
             HumanData humanData = this.m_PrefabHumanData[prefabRef.m_Prefab];
             pathOwner.m_State &= ~(PathFlags.AddDestination | PathFlags.Divert);
-            // ISSUE: reference to a compiler-generated field
-            // ISSUE: reference to a compiler-generated field
+
             PathfindParameters parameters = new PathfindParameters()
             {
                 m_MaxSpeed = (float2)277.777771f,
@@ -3872,6 +3871,23 @@ public partial class RPFResidentAISystem : GameSystemBase
                 m_RandomCost = 30f,
                 m_ActivityMask = creatureData.m_SupportedActivities
             };
+
+            bool hasCar = (parameters.m_Methods & PathMethod.Road) != 0;
+            bool hasWalkOrPT = (parameters.m_Methods & (PathMethod.Pedestrian | PathMethod.PublicTransportDay | PathMethod.PublicTransportNight)) != 0;
+
+            // Only perturb car-only requests (keeps PT/walk unaffected).
+
+            // Stable seed per trip from (citizen, path id, user salt)
+            ulong pathId = (ulong)pathOwner.m_ElementIndex; // if not valid yet, fall back to 0
+            uint seed = RPFRouteUtils.MakeChoiceSeed(resident.m_Citizen, pathId, 1337);
+            float g = RPFRouteUtils.SampleGumbel01(seed);   // mean~0 taste shock
+
+            // Simple ±10% linear bias on "time" weight (fast & allocation-free)
+            float bias = math.clamp(g * (choice_tau / 30f), -0.05f, 0.05f);
+            // PathfindWeights stores time/behaviour/money/comfort as x/y/z/w【:contentReference[oaicite:5]{index=5}】
+            parameters.m_Weights.m_Value.x *= (1f + bias);
+            // (Alternative: nudge m_MaxSpeed instead of the weight if you prefer.)
+
             // 1) Figure out origin & destination in XZ (meters)
             float2 originXZ = default, destXZ = default;
 
@@ -4341,77 +4357,34 @@ public partial class RPFResidentAISystem : GameSystemBase
         public void Execute()
         {
       		NativeParallelHashMap<Entity, int3> freeSpaceMap = new NativeParallelHashMap<Entity, int3>();
-            // ISSUE: variable of a compiler-generated type
             ResidentAISystem.Boarding boarding;
-            // ISSUE: reference to a compiler-generated field
             while (this.m_BoardingQueue.TryDequeue(out boarding))
             {
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: variable of a compiler-generated type
                 ResidentAISystem.BoardingType type = boarding.m_Type;
                 switch (type)
                 {
                     case ResidentAISystem.BoardingType.Exit:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
             			this.ExitVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Household, boarding.m_Leader, boarding.m_Vehicle, boarding.m_CurrentLane, boarding.m_Position, boarding.m_Rotation, boarding.m_TicketPrice);
                         continue;
                     case ResidentAISystem.BoardingType.TryEnter:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
                         this.TryEnterVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Leader, boarding.m_Vehicle, boarding.m_LeaderVehicle, boarding.m_Waypoint, boarding.m_Position, boarding.m_Flags);
                         continue;
                     case ResidentAISystem.BoardingType.FinishEnter:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
                         this.FinishEnterVehicle(boarding.m_Passenger, boarding.m_Household, boarding.m_Vehicle, boarding.m_LeaderVehicle, boarding.m_CurrentLane, boarding.m_TicketPrice);
                         continue;
                     case ResidentAISystem.BoardingType.CancelEnter:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
                         this.CancelEnterVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Vehicle);
                         continue;
                     case ResidentAISystem.BoardingType.RequireStop:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
                         this.RequireStop(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Vehicle, boarding.m_Position);
                         continue;
                     case ResidentAISystem.BoardingType.WaitTimeExceeded:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
                         this.WaitTimeExceeded(boarding.m_Passenger, boarding.m_Waypoint);
                         continue;
                     case ResidentAISystem.BoardingType.WaitTimeEstimate:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
                         this.WaitTimeEstimate(boarding.m_Waypoint, boarding.m_TicketPrice);
                         continue;
                     case ResidentAISystem.BoardingType.FinishExit:
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated field
-                        // ISSUE: reference to a compiler-generated method
                         this.FinishExitVehicle(ref freeSpaceMap, boarding.m_Passenger, boarding.m_Vehicle);
                         continue;
                     default:
