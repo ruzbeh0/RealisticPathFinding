@@ -100,6 +100,10 @@ namespace RealisticPathFinding.Systems
             // 3) Build BoardingJob with ALL lookups it needs (you already wired these in previous step)
             var boardingJob = new RPFResidentAISystem.BoardingJob
             {
+                m_Unspawneds = GetComponentLookup<Unspawned>(true),
+                m_Bicycles = GetComponentLookup<Bicycle>(true),
+                m_PlaybackLayers = GetBufferLookup<PlaybackLayer>(false),
+
                 m_Citizens = GetComponentLookup<Game.Citizens.Citizen>(true),
                 m_Transforms = GetComponentLookup<Game.Objects.Transform>(true),
                 m_PrefabRefData = GetComponentLookup<Game.Prefabs.PrefabRef>(true),

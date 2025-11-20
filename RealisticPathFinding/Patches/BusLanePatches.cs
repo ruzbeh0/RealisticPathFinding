@@ -1,8 +1,11 @@
 ﻿// RPFPatches_BusLanePenalty.cs
+using Game.Net;
 using Game.Pathfind;
 using Game.Prefabs;
 using HarmonyLib;
 using Unity.Mathematics;
+using CarLane = Game.Net.CarLane;
+
 // Disambiguation aliases (optional but keeps the attributes tidy)
 using NetCarLane = Game.Net.CarLane;
 using NetTrackLane = Game.Net.TrackLane;
@@ -25,7 +28,13 @@ namespace RealisticPathFinding.Patches
     //   PathfindCarData carPathfindData,
     //   float density)
     [HarmonyPatch(typeof(PathUtils), nameof(PathUtils.GetCarDriveSpecification),
-        new[] { typeof(Game.Net.Curve), typeof(NetCarLane), typeof(PrefabCarLaneData), typeof(PathfindCarData), typeof(float) })]
+        new[] { typeof(Curve),                    // Colossal.Mathematics.Curve
+        typeof(CarLane),                  // Game.Net.CarLane
+        typeof(MasterLane),               // Game.Net.MasterLane
+        typeof(CarLaneData),              // Game.Net.CarLaneData
+        typeof(PathfindCarData),          // Game.Pathfind.PathfindCarData
+        typeof(RuleFlags),                // Game.Pathfind.RuleFlags
+        typeof(float)})]
     static class Patch_GetCarDriveSpecification_Road
     {
         static void Postfix(ref PathSpecification __result, ref NetCarLane carLane)
@@ -51,7 +60,13 @@ namespace RealisticPathFinding.Patches
     //   PathfindCarData carPathfindData,
     //   float density)
     [HarmonyPatch(typeof(PathUtils), nameof(PathUtils.GetCarDriveSpecification),
-        new[] { typeof(Game.Net.Curve), typeof(NetCarLane), typeof(NetTrackLane), typeof(PrefabCarLaneData), typeof(PathfindCarData), typeof(float) })]
+        new[] { typeof(Curve),                    // Colossal.Mathematics.Curve
+        typeof(CarLane),                  // Game.Net.CarLane
+        typeof(MasterLane),               // Game.Net.MasterLane
+        typeof(CarLaneData),              // Game.Net.CarLaneData
+        typeof(PathfindCarData),          // Game.Pathfind.PathfindCarData
+        typeof(RuleFlags),                // Game.Pathfind.RuleFlags
+        typeof(float) })]
     static class Patch_GetCarDriveSpecification_RoadWithTrack
     {
         static void Postfix(ref PathSpecification __result, ref NetCarLane carLane)
@@ -75,7 +90,12 @@ namespace RealisticPathFinding.Patches
     //   PathfindTransportData transportPathfindData,
     //   float density)
     [HarmonyPatch(typeof(PathUtils), nameof(PathUtils.GetTaxiDriveSpecification),
-        new[] { typeof(Game.Net.Curve), typeof(NetCarLane), typeof(PathfindCarData), typeof(PathfindTransportData), typeof(float) })]
+        new[] { typeof(Curve),               // Colossal.Mathematics.Curve
+        typeof(CarLane),             // Game.Net.CarLane
+        typeof(PathfindCarData),     // Game.Pathfind.PathfindCarData
+        typeof(PathfindTransportData), // Game.Pathfind.PathfindTransportData
+        typeof(RuleFlags),           // Game.Pathfind.RuleFlags
+        typeof(float) })]
     static class Patch_GetTaxiDriveSpecification
     {
         static void Postfix(ref PathSpecification __result, ref NetCarLane carLaneData)

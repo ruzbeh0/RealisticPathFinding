@@ -153,12 +153,14 @@ public partial class RPFResidentAISystem : GameSystemBase
         float minMult = 0.60f;
 
         // If you have a settings object:
-        if (Mod.m_Setting != null)
+        if (Mod.m_Setting == null)
         {
-            comfort = Mod.m_Setting.walk_long_comfort_m;
-            ramp = Mod.m_Setting.walk_long_ramp_m;
-            minMult = Mod.m_Setting.walk_long_min_mult;
+            return;
         }
+
+        comfort = Mod.m_Setting.walk_long_comfort_m;
+        ramp = Mod.m_Setting.walk_long_ramp_m;
+        minMult = Mod.m_Setting.walk_long_min_mult;
 
         RPFResidentAISystem.ResidentTickJob jobData = new RPFResidentAISystem.ResidentTickJob()
         {
@@ -209,6 +211,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             m_CurrentTransportData = InternalCompilerInterface.GetComponentLookup<CurrentTransport>(ref this.__TypeHandle.__Game_Citizens_CurrentTransport_RO_ComponentLookup, ref this.CheckedStateRef),
             m_WorkerData = InternalCompilerInterface.GetComponentLookup<Worker>(ref this.__TypeHandle.__Game_Citizens_Worker_RO_ComponentLookup, ref this.CheckedStateRef),
             m_CarKeeperData = InternalCompilerInterface.GetComponentLookup<CarKeeper>(ref this.__TypeHandle.__Game_Citizens_CarKeeper_RO_ComponentLookup, ref this.CheckedStateRef),
+            m_BicycleOwnerData = InternalCompilerInterface.GetComponentLookup<BicycleOwner>(ref this.__TypeHandle.__Game_Citizens_BicycleOwner_RO_ComponentLookup, ref this.CheckedStateRef),
             m_HealthProblemData = InternalCompilerInterface.GetComponentLookup<HealthProblem>(ref this.__TypeHandle.__Game_Citizens_HealthProblem_RO_ComponentLookup, ref this.CheckedStateRef),
             m_TravelPurposeData = InternalCompilerInterface.GetComponentLookup<TravelPurpose>(ref this.__TypeHandle.__Game_Citizens_TravelPurpose_RO_ComponentLookup, ref this.CheckedStateRef),
             m_HomelessHouseholdData = InternalCompilerInterface.GetComponentLookup<HomelessHousehold>(ref this.__TypeHandle.__Game_Citizens_HomelessHousehold_RO_ComponentLookup, ref this.CheckedStateRef),
@@ -620,6 +623,8 @@ public partial class RPFResidentAISystem : GameSystemBase
         public ComponentLookup<Worker> m_WorkerData;
         [ReadOnly]
         public ComponentLookup<CarKeeper> m_CarKeeperData;
+        [ReadOnly]
+        public ComponentLookup<BicycleOwner> m_BicycleOwnerData;
         [ReadOnly]
         public ComponentLookup<HealthProblem> m_HealthProblemData;
         [ReadOnly]
@@ -1828,27 +1833,12 @@ public partial class RPFResidentAISystem : GameSystemBase
                 bool isDriver = (currentVehicle.m_Flags & CreatureVehicleFlags.Driver) > (CreatureVehicleFlags)0;
                 ActivityCondition conditions = CreatureUtils.GetConditions(human);
         		PseudoRandomSeed componentData3;
-        		// ISSUE: reference to a compiler-generated field
         		this.m_PseudoRandomSeedData.TryGetComponent(entity, out componentData3);
-                ActivityMask activityMask;
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
-        		Game.Objects.Transform vehicleDoorPosition = CreatureUtils.GetVehicleDoorPosition(ref random, ActivityType.Exit, conditions, vehicleTransform, componentData3, targetPosition, isDriver, this.m_LefthandTraffic, prefabRef.m_Prefab, currentVehicle.m_Vehicle, new DynamicBuffer<MeshGroup>(), ref this.m_PublicTransportData, ref this.m_TrainData, ref this.m_ControllerData, ref this.m_PrefabRefData, ref this.m_PrefabCarData, ref this.m_PrefabActivityLocationElements, ref subMeshGroupBuffers, ref characterElementBuffers, ref subMeshBuffers, ref animationClipBuffers, ref animationMotionBuffers, out activityMask, out AnimatedPropID _);
+                ActivityMask activityMask1;
+
+                Game.Objects.Transform vehicleDoorPosition = CreatureUtils.GetVehicleDoorPosition(ref random, ActivityType.Exit, conditions, vehicleTransform, componentData3, targetPosition, isDriver, this.m_LefthandTraffic, prefabRef.m_Prefab, currentVehicle.m_Vehicle, new DynamicBuffer<MeshGroup>(), ref this.m_PublicTransportData, ref this.m_TrainData, ref this.m_ControllerData, ref this.m_PrefabRefData, ref this.m_PrefabCarData, ref this.m_PrefabActivityLocationElements, ref subMeshGroupBuffers, ref characterElementBuffers, ref subMeshBuffers, ref animationClipBuffers, ref animationMotionBuffers, out activityMask1, out AnimatedPropID _);
                 if (pathOwner.m_ElementIndex < pathElement1.Length && (pathOwner.m_State & PathFlags.Obsolete) == (PathFlags)0)
                 {
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
                     CreatureUtils.FixPathStart(ref random, vehicleDoorPosition.m_Position, pathOwner.m_ElementIndex, pathElement1, ref this.m_OwnerData, ref this.m_LaneData, ref this.m_EdgeLaneData, ref this.m_ConnectionLaneData, ref this.m_CurveData, ref this.m_SubLanes, ref this.m_AreaNodes, ref this.m_AreaTriangles);
                     PathElement pathElement3 = pathElement1[pathOwner.m_ElementIndex];
                     CreatureLaneFlags flags1 = (CreatureLaneFlags)0;
@@ -1893,7 +1883,6 @@ public partial class RPFResidentAISystem : GameSystemBase
                             }
                             else
                             {
-                                // ISSUE: reference to a compiler-generated field
                                 if (this.m_PrefabRefData.HasComponent(pathElement3.m_Target))
                                     newCurrentLane = new HumanCurrentLane(flags1 | CreatureLaneFlags.FindLane);
                             }
@@ -1902,29 +1891,26 @@ public partial class RPFResidentAISystem : GameSystemBase
                 }
                 if (newCurrentLane.m_Lane == Entity.Null)
                 {
-                    // ISSUE: reference to a compiler-generated field
                     if (this.m_UnspawnedData.HasComponent(currentVehicle.m_Vehicle))
                         newCurrentLane.m_Flags |= CreatureLaneFlags.EmergeUnspawned;
           			PathOwner componentData4;
-                    // ISSUE: reference to a compiler-generated field
           			if (this.m_PathOwnerData.TryGetComponent(controllerVehicle, out componentData4) && VehicleUtils.PathfindFailed(componentData4))
                     {
                         newCurrentLane.m_Flags |= CreatureLaneFlags.EmergeUnspawned;
                         pathOwner.m_State |= PathFlags.Stuck;
                     }
                 }
-                if (((int)activityMask.m_Mask & (int)new ActivityMask(ActivityType.Driving).m_Mask) != 0)
+                ActivityMask activityMask2 = new ActivityMask(ActivityType.Driving);
+                activityMask2.m_Mask |= new ActivityMask(ActivityType.Biking).m_Mask;
+                if (((int)activityMask1.m_Mask & (int)activityMask2.m_Mask) != 0)
                     newCurrentLane.m_Flags |= CreatureLaneFlags.EndOfPath | CreatureLaneFlags.EndReached;
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated method
+
         		this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.ExitVehicle(entity, household, groupMember.m_Leader, currentVehicle.m_Vehicle, newCurrentLane, vehicleDoorPosition.m_Position, vehicleDoorPosition.m_Rotation, ticketPrice));
             }
             else
             {
-                // ISSUE: reference to a compiler-generated field
                 Game.Objects.Transform transform = this.m_TransformData[entity];
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated method
+
         		this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.ExitVehicle(entity, household, groupMember.m_Leader, currentVehicle.m_Vehicle, new HumanCurrentLane(), transform.m_Position, transform.m_Rotation, ticketPrice));
                 pathOwner.m_State &= ~PathFlags.Failed;
                 pathOwner.m_State |= PathFlags.Obsolete;
@@ -2374,11 +2360,19 @@ public partial class RPFResidentAISystem : GameSystemBase
                     break;
             }
             ParkedCar componentData2 = new ParkedCar();
-            CarKeeper component;
+            CarKeeper component1;
 
-            if (this.m_CarKeeperData.TryGetEnabledComponent<CarKeeper>(resident.m_Citizen, out component))
+            if (this.m_CarKeeperData.TryGetEnabledComponent<CarKeeper>(resident.m_Citizen, out component1))
             {
-                this.m_ParkedCarData.TryGetComponent(component.m_Car, out componentData2);
+                this.m_ParkedCarData.TryGetComponent(component1.m_Car, out componentData2);
+            }
+            else
+            {
+                BicycleOwner component2;
+                if (this.m_BicycleOwnerData.TryGetEnabledComponent<BicycleOwner>(resident.m_Citizen, out component2))
+                {
+                    this.m_ParkedCarData.TryGetComponent(component2.m_Bicycle, out componentData2);
+                }
             }
             int length = pathElement1.Length;
             for (int index = 0; index < pathElement1.Length; ++index)
@@ -2658,32 +2652,27 @@ public partial class RPFResidentAISystem : GameSystemBase
           ref PathOwner pathOwner,
           ResetTrip resetTrip)
         {
-            // ISSUE: reference to a compiler-generated field
             if (this.m_VehicleData.HasComponent(target.m_Target))
             {
-                // ISSUE: reference to a compiler-generated method
                 return this.ReachVehicle(jobIndex, creatureEntity, ref resident, ref currentLane, ref target, ref pathOwner);
             }
             Entity entity1 = target.m_Target;
-            // ISSUE: reference to a compiler-generated field
             if (this.m_PropertyRenters.HasComponent(entity1))
             {
-                // ISSUE: reference to a compiler-generated field
                 entity1 = this.m_PropertyRenters[entity1].m_Property;
             }
-            // ISSUE: reference to a compiler-generated field
-            // ISSUE: reference to a compiler-generated field
+
             if (this.m_OnFireData.HasComponent(entity1) || this.m_DestroyedData.HasComponent(entity1))
             {
-                // ISSUE: reference to a compiler-generated method
                 this.SetDivert(jobIndex, creatureEntity, ref resident, ref currentLane, ref divert, ref pathOwner, Game.Citizens.Purpose.Safety, Entity.Null);
                 return false;
             }
-            if ((currentLane.m_Flags & CreatureLaneFlags.Hangaround) != (CreatureLaneFlags)0)
+            if (this.CanHangAround(resident.m_Citizen))
+            {
+                if ((currentLane.m_Flags & CreatureLaneFlags.Hangaround) != (CreatureLaneFlags)0)
             {
                 if ((currentLane.m_Flags & (CreatureLaneFlags.TransformTarget | CreatureLaneFlags.ActivityDone)) == (CreatureLaneFlags.TransformTarget | CreatureLaneFlags.ActivityDone) || random.NextInt(2500) == 0)
                 {
-                    // ISSUE: reference to a compiler-generated method
                     ResidentFlags ignoreFlags = this.GetIgnoreFlags(entity1, ref resident, ref currentLane);
                     if (ignoreFlags != ResidentFlags.None)
                     {
@@ -2739,31 +2728,45 @@ public partial class RPFResidentAISystem : GameSystemBase
                 }
                 resident.m_Flags |= ResidentFlags.Hangaround;
             }
+            }
+            else
+                resident.m_Flags &= ~ResidentFlags.Hangaround;
             human.m_Flags &= ~(HumanFlags.Run | HumanFlags.Emergency);
             resident.m_Flags &= ~(ResidentFlags.IgnoreTaxi | ResidentFlags.IgnoreTransport);
             if ((resident.m_Flags & ResidentFlags.Arrived) == ResidentFlags.None)
             {
                 resetTrip.m_Creature = creatureEntity;
                 resetTrip.m_Arrived = entity1;
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
+
                 Entity entity4 = this.m_CommandBuffer.CreateEntity(jobIndex, this.m_ResetTripArchetype);
-                // ISSUE: reference to a compiler-generated field
                 this.m_CommandBuffer.SetComponent<ResetTrip>(jobIndex, entity4, resetTrip);
                 resident.m_Flags |= ResidentFlags.Arrived;
+                TravelPurpose componentData4;
+                BicycleOwner componentData5;
+                Game.Vehicles.PersonalCar componentData6;
+
+                if (this.m_TravelPurposeData.TryGetComponent(resident.m_Citizen, out componentData4) && componentData4.m_Purpose == Game.Citizens.Purpose.GoingHome && this.m_BicycleOwnerData.TryGetComponent(resident.m_Citizen, out componentData5) && this.m_PersonalCarData.TryGetComponent(componentData5.m_Bicycle, out componentData6) && (componentData6.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
+                {
+                    DynamicBuffer<LayoutElement> bufferData;
+                    this.m_VehicleLayouts.TryGetBuffer(componentData5.m_Bicycle, out bufferData);
+                    VehicleUtils.DeleteVehicle(this.m_CommandBuffer, jobIndex, componentData5.m_Bicycle, bufferData);
+                }
                 return false;
             }
             if ((resident.m_Flags & ResidentFlags.Hangaround) != ResidentFlags.None)
                 return false;
-            // ISSUE: reference to a compiler-generated field
             if (this.m_EntityLookup.Exists(resident.m_Citizen))
             {
-                // ISSUE: reference to a compiler-generated field
                 this.m_CommandBuffer.RemoveComponent<CurrentTransport>(jobIndex, resident.m_Citizen);
             }
-            // ISSUE: reference to a compiler-generated field
             this.m_CommandBuffer.AddComponent<Deleted>(jobIndex, creatureEntity, new Deleted());
             return true;
+        }
+
+        private bool CanHangAround(Entity citizenEntity)
+        {
+            TravelPurpose componentData;
+            return !this.m_TravelPurposeData.TryGetComponent(citizenEntity, out componentData) || componentData.m_Purpose != Game.Citizens.Purpose.Sleeping;
         }
 
         private ResidentFlags GetIgnoreFlags(
@@ -3478,7 +3481,6 @@ public partial class RPFResidentAISystem : GameSystemBase
             // ISSUE: reference to a compiler-generated field
             // ISSUE: reference to a compiler-generated field
             Entity entity1 = this.m_CommandBuffer.CreateEntity(jobIndex, this.m_ResetTripArchetype);
-            // ISSUE: reference to a compiler-generated field
             this.m_CommandBuffer.SetComponent<ResetTrip>(jobIndex, entity1, new ResetTrip()
             {
                 m_Creature = entity,
@@ -3500,64 +3502,58 @@ public partial class RPFResidentAISystem : GameSystemBase
         {
             if ((currentLane.m_Flags & CreatureLaneFlags.Taxi) != (CreatureLaneFlags)0)
             {
+                RideNeeder componentData1;
                 // ISSUE: reference to a compiler-generated field
-                if (this.m_RideNeederData.HasComponent(entity))
+                if (this.m_RideNeederData.TryGetComponent(entity, out componentData1))
                 {
+                    Dispatched componentData2;
                     // ISSUE: reference to a compiler-generated field
-                    RideNeeder rideNeeder = this.m_RideNeederData[entity];
-                    // ISSUE: reference to a compiler-generated field
-                    if (this.m_Dispatched.HasComponent(rideNeeder.m_RideRequest))
+                    if (this.m_Dispatched.TryGetComponent(componentData1.m_RideRequest, out componentData2))
                     {
+                        Game.Vehicles.Taxi componentData3;
+                        DynamicBuffer<ServiceDispatch> bufferData;
                         // ISSUE: reference to a compiler-generated field
-                        Dispatched dispatched = this.m_Dispatched[rideNeeder.m_RideRequest];
                         // ISSUE: reference to a compiler-generated field
-                        if (this.m_TaxiData.HasComponent(dispatched.m_Handler))
+                        if (this.m_TaxiData.TryGetComponent(componentData2.m_Handler, out componentData3) && this.m_ServiceDispatches.TryGetBuffer(componentData2.m_Handler, out bufferData) && (componentData3.m_State & TaxiFlags.Dispatched) != (TaxiFlags)0 && bufferData.Length >= 1 && bufferData[0].m_Request == componentData1.m_RideRequest)
                         {
                             // ISSUE: reference to a compiler-generated field
-                            Game.Vehicles.Taxi taxi = this.m_TaxiData[dispatched.m_Handler];
-                            // ISSUE: reference to a compiler-generated field
-                            DynamicBuffer<ServiceDispatch> serviceDispatch = this.m_ServiceDispatches[dispatched.m_Handler];
-                            if ((taxi.m_State & TaxiFlags.Dispatched) != (TaxiFlags)0 && serviceDispatch.Length >= 1 && serviceDispatch[0].m_Request == rideNeeder.m_RideRequest)
+                            if (this.m_CarNavigationLanes.HasBuffer(componentData2.m_Handler))
                             {
                                 // ISSUE: reference to a compiler-generated field
-                                if (this.m_CarNavigationLanes.HasBuffer(dispatched.m_Handler))
+                                DynamicBuffer<PathElement> pathElement1 = this.m_PathElements[entity];
+                                // ISSUE: reference to a compiler-generated field
+                                DynamicBuffer<CarNavigationLane> carNavigationLane1 = this.m_CarNavigationLanes[componentData2.m_Handler];
+                                if (carNavigationLane1.Length > 0 && pathElement1.Length > pathOwner.m_ElementIndex)
                                 {
+                                    PathElement pathElement2 = pathElement1[pathOwner.m_ElementIndex];
+                                    CarNavigationLane carNavigationLane2 = carNavigationLane1[carNavigationLane1.Length - 1];
                                     // ISSUE: reference to a compiler-generated field
-                                    DynamicBuffer<PathElement> pathElement1 = this.m_PathElements[entity];
                                     // ISSUE: reference to a compiler-generated field
-                                    DynamicBuffer<CarNavigationLane> carNavigationLane1 = this.m_CarNavigationLanes[dispatched.m_Handler];
-                                    if (carNavigationLane1.Length > 0 && pathElement1.Length > pathOwner.m_ElementIndex)
+                                    if (carNavigationLane2.m_Lane == pathElement2.m_Target && (double)carNavigationLane2.m_CurvePosition.y != (double)pathElement2.m_TargetDelta.y && this.m_CurveData.HasComponent(currentLane.m_Lane) && this.m_CurveData.HasComponent(pathElement2.m_Target))
                                     {
-                                        PathElement pathElement2 = pathElement1[pathOwner.m_ElementIndex];
-                                        CarNavigationLane carNavigationLane2 = carNavigationLane1[carNavigationLane1.Length - 1];
+                                        pathElement2.m_TargetDelta = (float2)carNavigationLane2.m_CurvePosition.y;
+                                        pathElement1[pathOwner.m_ElementIndex] = pathElement2;
                                         // ISSUE: reference to a compiler-generated field
+                                        float3 position = MathUtils.Position(this.m_CurveData[pathElement2.m_Target].m_Bezier, pathElement2.m_TargetDelta.y);
+                                        float t;
                                         // ISSUE: reference to a compiler-generated field
-                                        if (carNavigationLane2.m_Lane == pathElement2.m_Target && (double)carNavigationLane2.m_CurvePosition.y != (double)pathElement2.m_TargetDelta.y && this.m_CurveData.HasComponent(currentLane.m_Lane) && this.m_CurveData.HasComponent(pathElement2.m_Target))
+                                        double num = (double)MathUtils.Distance(this.m_CurveData[currentLane.m_Lane].m_Bezier, position, out t);
+                                        if ((double)t != (double)currentLane.m_CurvePosition.y)
                                         {
-                                            pathElement2.m_TargetDelta = (float2)carNavigationLane2.m_CurvePosition.y;
-                                            pathElement1[pathOwner.m_ElementIndex] = pathElement2;
-                                            // ISSUE: reference to a compiler-generated field
-                                            float3 position = MathUtils.Position(this.m_CurveData[pathElement2.m_Target].m_Bezier, pathElement2.m_TargetDelta.y);
-                                            float t;
-                                            // ISSUE: reference to a compiler-generated field
-                                            double num = (double)MathUtils.Distance(this.m_CurveData[currentLane.m_Lane].m_Bezier, position, out t);
-                                            if ((double)t != (double)currentLane.m_CurvePosition.y)
-                                            {
-                                                currentLane.m_CurvePosition.y = t;
-                                                currentLane.m_Flags &= ~CreatureLaneFlags.EndReached;
-                                                return true;
-                                            }
+                                            currentLane.m_CurvePosition.y = t;
+                                            currentLane.m_Flags &= ~CreatureLaneFlags.EndReached;
+                                            return true;
                                         }
                                     }
                                 }
-                                if ((taxi.m_State & TaxiFlags.Boarding) != (TaxiFlags)0)
-                                {
-                                    // ISSUE: reference to a compiler-generated field
-                                    Game.Objects.Transform transform = this.m_TransformData[entity];
-                                    // ISSUE: reference to a compiler-generated field
-                                    // ISSUE: reference to a compiler-generated method
-                                    this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.TryEnterVehicle(entity, Entity.Null, dispatched.m_Handler, Entity.Null, Entity.Null, transform.m_Position, CreatureVehicleFlags.Leader));
-                                }
+                            }
+                            if ((componentData3.m_State & TaxiFlags.Boarding) != (TaxiFlags)0)
+                            {
+                                // ISSUE: reference to a compiler-generated field
+                                Game.Objects.Transform transform = this.m_TransformData[entity];
+                                // ISSUE: reference to a compiler-generated field
+                                // ISSUE: reference to a compiler-generated method
+                                this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.TryEnterVehicle(entity, Entity.Null, componentData2.m_Handler, Entity.Null, Entity.Null, transform.m_Position, CreatureVehicleFlags.Leader));
                             }
                         }
                     }
@@ -3565,7 +3561,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                     {
                         // ISSUE: reference to a compiler-generated field
                         // ISSUE: reference to a compiler-generated field
-                        if (this.m_ServiceRequestData.HasComponent(rideNeeder.m_RideRequest) && this.m_ServiceRequestData[rideNeeder.m_RideRequest].m_FailCount >= (byte)3)
+                        if (this.m_ServiceRequestData.HasComponent(componentData1.m_RideRequest) && this.m_ServiceRequestData[componentData1.m_RideRequest].m_FailCount >= (byte)3)
                         {
                             resident.m_Flags |= ResidentFlags.IgnoreTaxi;
                             currentLane.m_Flags &= ~(CreatureLaneFlags.ParkingSpace | CreatureLaneFlags.Taxi);
@@ -3582,19 +3578,39 @@ public partial class RPFResidentAISystem : GameSystemBase
                 this.m_CommandBuffer.AddComponent<RideNeeder>(jobIndex, entity, new RideNeeder());
                 return true;
             }
-            CarKeeper component;
+            CarKeeper component1;
             // ISSUE: reference to a compiler-generated field
-            // ISSUE: reference to a compiler-generated field
-            if (this.m_CarKeeperData.TryGetEnabledComponent<CarKeeper>(resident.m_Citizen, out component) && this.m_ParkedCarData.HasComponent(component.m_Car))
+            if (this.m_CarKeeperData.TryGetEnabledComponent<CarKeeper>(resident.m_Citizen, out component1))
             {
-                // ISSUE: reference to a compiler-generated method
-                this.ActivateParkedCar(jobIndex, ref random, entity, component.m_Car, ref resident, ref pathOwner, ref target, groupCreatures);
                 // ISSUE: reference to a compiler-generated field
-                Game.Objects.Transform transform = this.m_TransformData[entity];
+                if (this.m_ParkedCarData.HasComponent(component1.m_Car))
+                {
+                    // ISSUE: reference to a compiler-generated method
+                    this.ActivateParkedCar(jobIndex, ref random, entity, component1.m_Car, ref resident, ref pathOwner, ref target, groupCreatures);
+                    // ISSUE: reference to a compiler-generated field
+                    Game.Objects.Transform transform = this.m_TransformData[entity];
+                    // ISSUE: reference to a compiler-generated field
+                    // ISSUE: reference to a compiler-generated method
+                    this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.TryEnterVehicle(entity, Entity.Null, component1.m_Car, Entity.Null, Entity.Null, transform.m_Position, CreatureVehicleFlags.Leader | CreatureVehicleFlags.Driver));
+                    return true;
+                }
+            }
+            else
+            {
+                BicycleOwner component2;
                 // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated method
-                this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.TryEnterVehicle(entity, Entity.Null, component.m_Car, Entity.Null, Entity.Null, transform.m_Position, CreatureVehicleFlags.Leader | CreatureVehicleFlags.Driver));
-                return true;
+                // ISSUE: reference to a compiler-generated field
+                if (this.m_BicycleOwnerData.TryGetEnabledComponent<BicycleOwner>(resident.m_Citizen, out component2) && this.m_ParkedCarData.HasComponent(component2.m_Bicycle))
+                {
+                    // ISSUE: reference to a compiler-generated method
+                    this.ActivateParkedCar(jobIndex, ref random, entity, component2.m_Bicycle, ref resident, ref pathOwner, ref target, groupCreatures);
+                    // ISSUE: reference to a compiler-generated field
+                    Game.Objects.Transform transform = this.m_TransformData[entity];
+                    // ISSUE: reference to a compiler-generated field
+                    // ISSUE: reference to a compiler-generated method
+                    this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.TryEnterVehicle(entity, Entity.Null, component2.m_Bicycle, Entity.Null, Entity.Null, transform.m_Position, CreatureVehicleFlags.Leader | CreatureVehicleFlags.Driver));
+                    return true;
+                }
             }
             currentLane.m_Flags &= ~(CreatureLaneFlags.ParkingSpace | CreatureLaneFlags.Taxi);
             pathOwner.m_State &= ~PathFlags.Failed;
@@ -3775,9 +3791,7 @@ public partial class RPFResidentAISystem : GameSystemBase
 
         private void FinishExitVehicle(Entity entity, Entity vehicle, ref HumanCurrentLane currentLane)
         {
-            currentLane.m_Flags &= ~CreatureLaneFlags.EndOfPath;
-            // ISSUE: reference to a compiler-generated field
-            // ISSUE: reference to a compiler-generated method
+            currentLane.m_Flags &= ~(CreatureLaneFlags.EndOfPath | CreatureLaneFlags.EndReached);
             this.m_BoardingQueue.Enqueue(ResidentAISystem.Boarding.FinishExitVehicle(entity, vehicle));
         }
 
@@ -3835,26 +3849,31 @@ public partial class RPFResidentAISystem : GameSystemBase
         }
 
         private void FindNewPath(
-          Entity entity,
-          PrefabRef prefabRef,
-          ref Game.Creatures.Resident resident,
-          ref Human human,
-          ref HumanCurrentLane currentLane,
-          ref PathOwner pathOwner,
-          ref Game.Common.Target target,
-          ref Divert divert)
+      Entity entity,
+      PrefabRef prefabRef,
+      ref Game.Creatures.Resident resident,
+      ref Human human,
+      ref HumanCurrentLane currentLane,
+      ref PathOwner pathOwner,
+      ref Game.Common.Target target,
+      ref Divert divert)
         {
+            // ISSUE: reference to a compiler-generated field
             CreatureData creatureData = this.m_PrefabCreatureData[prefabRef.m_Prefab];
+            // ISSUE: reference to a compiler-generated field
             HumanData humanData = this.m_PrefabHumanData[prefabRef.m_Prefab];
             pathOwner.m_State &= ~(PathFlags.AddDestination | PathFlags.Divert);
-
+            // ISSUE: reference to a compiler-generated field
+            // ISSUE: reference to a compiler-generated field
             PathfindParameters parameters = new PathfindParameters()
             {
                 m_MaxSpeed = (float2)277.777771f,
                 m_WalkSpeed = (float2)humanData.m_WalkSpeed,
                 m_Weights = new PathfindWeights(1f, 1f, 1f, 1f),
-                m_Methods = PathMethod.Pedestrian | RouteUtils.GetTaxiMethods(resident) | RouteUtils.GetPublicTransportMethods(resident, this.m_TimeOfDay),
-                m_SecondaryIgnoredRules = VehicleUtils.GetIgnoredPathfindRulesTaxiDefaults(),
+                m_Methods = PathMethod.Pedestrian
+                          | RouteUtils.GetTaxiMethods(resident)
+                          | RouteUtils.GetPublicTransportMethods(resident, this.m_TimeOfDay),
+                m_TaxiIgnoredRules = VehicleUtils.GetIgnoredPathfindRulesTaxiDefaults(),
                 m_MaxCost = CitizenBehaviorSystem.kMaxPathfindCost
             };
             SetupQueueTarget origin = new SetupQueueTarget()
@@ -3871,81 +3890,59 @@ public partial class RPFResidentAISystem : GameSystemBase
                 m_RandomCost = 30f,
                 m_ActivityMask = creatureData.m_SupportedActivities
             };
-
-            bool hasCar = (parameters.m_Methods & PathMethod.Road) != 0;
-            bool hasWalkOrPT = (parameters.m_Methods & (PathMethod.Pedestrian | PathMethod.PublicTransportDay | PathMethod.PublicTransportNight)) != 0;
-
-            // Only perturb car-only requests (keeps PT/walk unaffected).
-
-            // Stable seed per trip from (citizen, path id, user salt)
-            ulong pathId = (ulong)pathOwner.m_ElementIndex; // if not valid yet, fall back to 0
-            uint seed = RPFRouteUtils.MakeChoiceSeed(resident.m_Citizen, pathId, 1337);
-            float g = RPFRouteUtils.SampleGumbel01(seed);   // mean~0 taste shock
-
-            // Simple ±10% linear bias on "time" weight (fast & allocation-free)
-            float bias = math.clamp(g * (choice_tau / 30f), -0.05f, 0.05f);
-            // PathfindWeights stores time/behaviour/money/comfort as x/y/z/w【:contentReference[oaicite:5]{index=5}】
-            parameters.m_Weights.m_Value.x *= (1f + bias);
-            // (Alternative: nudge m_MaxSpeed instead of the weight if you prefer.)
-
-            // 1) Figure out origin & destination in XZ (meters)
-            float2 originXZ = default, destXZ = default;
-
-            // origin: the resident’s current world position
-            if (m_TransformData.HasComponent(entity))
+            // ----------------------------------------------------------------
+            // RPF: long-distance walk speed scaling
+            // ----------------------------------------------------------------
+            float2 originXZ = default;
+            float2 destXZ = default;
+            if (this.m_TransformData.HasComponent(entity))
             {
-                var tr = m_TransformData[entity];
+                Game.Objects.Transform tr = this.m_TransformData[entity];
                 originXZ = XZ(tr.m_Position);
             }
-
-            // destination: from Game.Common.Target (prefer transform; fall back to stop/building center)
-            if (m_TransformData.HasComponent(target.m_Target))
+            if (this.m_TransformData.HasComponent(target.m_Target))
             {
-                var trT = m_TransformData[target.m_Target];
+                Game.Objects.Transform trT = this.m_TransformData[target.m_Target];
                 destXZ = XZ(trT.m_Position);
             }
             else
             {
-                // Fallbacks are fine; use whatever you already have available:
-                //  - currentLane end point
-                //  - building center
-                //  - target waypoint
-                // (replace the next line with your own helper)
-                destXZ = originXZ; // TODO: replace with your real dest XZ
+                // Fallback: if we don't know the target position, disable the effect.
+                destXZ = originXZ;
             }
-
-            // 2) Compute straight-line OD (meters)
             float odMeters = math.distance(originXZ, destXZ);
-
-            // 4) Apply the long-walk multiplier to pedestrian speed
-            float mult = LongWalkSpeedMultiplier(odMeters, ComfortMeters, RampMeters, MinSpeedMult);
+            float mult = LongWalkSpeedMultiplier(
+              odMeters,
+              this.ComfortMeters,
+              this.RampMeters,
+              this.MinSpeedMult);
             float baseWalk = parameters.m_WalkSpeed.x;
             float newWalk = baseWalk * mult;
             parameters.m_WalkSpeed = new float2(newWalk, newWalk);
+
+            Entity property = Entity.Null;
+            Entity entity1 = target.m_Target;
+            PropertyRenter componentData1;
             // ISSUE: reference to a compiler-generated field
-            if (this.m_CitizenData.HasComponent(resident.m_Citizen))
+            if (this.m_PropertyRenters.TryGetComponent(target.m_Target, out componentData1))
+                entity1 = componentData1.m_Property;
+            HouseholdMember componentData2;
+            // ISSUE: reference to a compiler-generated field
+            // ISSUE: reference to a compiler-generated field
+            if (this.m_HouseholdMembers.TryGetComponent(resident.m_Citizen, out componentData2) && this.m_PropertyRenters.TryGetComponent(componentData2.m_Household, out componentData1))
             {
-                // ISSUE: reference to a compiler-generated field
-                Citizen citizen = this.m_CitizenData[resident.m_Citizen];
-                // ISSUE: reference to a compiler-generated field
-                Entity household1 = this.m_HouseholdMembers[resident.m_Citizen].m_Household;
-                // ISSUE: reference to a compiler-generated field
-                Household household2 = this.m_HouseholdData[household1];
-                // ISSUE: reference to a compiler-generated field
-                DynamicBuffer<HouseholdCitizen> householdCitizen = this.m_HouseholdCitizens[household1];
-                parameters.m_Weights = CitizenUtils.GetPathfindWeights(citizen, household2, householdCitizen.Length);
+                property = componentData1.m_Property;
+                parameters.m_Authorization1 = componentData1.m_Property;
             }
+            Citizen componentData3;
             // ISSUE: reference to a compiler-generated field
-            if (this.m_HouseholdMembers.HasComponent(resident.m_Citizen))
+            if (this.m_CitizenData.TryGetComponent(resident.m_Citizen, out componentData3))
             {
                 // ISSUE: reference to a compiler-generated field
-                Entity household = this.m_HouseholdMembers[resident.m_Citizen].m_Household;
+                Household household = this.m_HouseholdData[componentData2.m_Household];
                 // ISSUE: reference to a compiler-generated field
-                if (this.m_PropertyRenters.HasComponent(household))
-                {
-                    // ISSUE: reference to a compiler-generated field
-                    parameters.m_Authorization1 = this.m_PropertyRenters[household].m_Property;
-                }
+                DynamicBuffer<HouseholdCitizen> householdCitizen = this.m_HouseholdCitizens[componentData2.m_Household];
+                parameters.m_Weights = CitizenUtils.GetPathfindWeights(componentData3, household, householdCitizen.Length);
             }
             // ISSUE: reference to a compiler-generated field
             if (this.m_WorkerData.HasComponent(resident.m_Citizen))
@@ -3956,34 +3953,82 @@ public partial class RPFResidentAISystem : GameSystemBase
                 // ISSUE: reference to a compiler-generated field
                 parameters.m_Authorization2 = !this.m_PropertyRenters.HasComponent(worker.m_Workplace) ? worker.m_Workplace : this.m_PropertyRenters[worker.m_Workplace].m_Property;
             }
-            CarKeeper component;
-            ParkedCar componentData1;
+            CarKeeper component1;
             // ISSUE: reference to a compiler-generated field
-            // ISSUE: reference to a compiler-generated field
-            if (this.m_CarKeeperData.TryGetEnabledComponent<CarKeeper>(resident.m_Citizen, out component) && this.m_ParkedCarData.TryGetComponent(component.m_Car, out componentData1))
+            if (this.m_CarKeeperData.TryGetEnabledComponent<CarKeeper>(resident.m_Citizen, out component1))
             {
+                ParkedCar componentData4;
                 // ISSUE: reference to a compiler-generated field
+                if (this.m_ParkedCarData.TryGetComponent(component1.m_Car, out componentData4))
+                {
+                    // ISSUE: reference to a compiler-generated field
+                    // ISSUE: reference to a compiler-generated field
+                    CarData carData = this.m_PrefabCarData[this.m_PrefabRefData[component1.m_Car].m_Prefab];
+                    parameters.m_MaxSpeed.x = carData.m_MaxSpeed;
+                    parameters.m_ParkingTarget = componentData4.m_Lane;
+                    parameters.m_ParkingDelta = componentData4.m_CurvePosition;
+                    // ISSUE: reference to a compiler-generated field
+                    // ISSUE: reference to a compiler-generated field
+                    parameters.m_ParkingSize = VehicleUtils.GetParkingSize(component1.m_Car, ref this.m_PrefabRefData, ref this.m_PrefabObjectGeometryData);
+                    parameters.m_Methods |= VehicleUtils.GetPathMethods(carData) | PathMethod.Parking;
+                    parameters.m_IgnoredRules = VehicleUtils.GetIgnoredPathfindRules(carData);
+                    Game.Vehicles.PersonalCar componentData5;
+                    // ISSUE: reference to a compiler-generated field
+                    if (this.m_PersonalCarData.TryGetComponent(component1.m_Car, out componentData5) && (componentData5.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
+                        parameters.m_PathfindFlags |= PathfindFlags.ParkingReset;
+                }
+            }
+            else
+            {
+                BicycleOwner component2;
                 // ISSUE: reference to a compiler-generated field
-                CarData carData = this.m_PrefabCarData[this.m_PrefabRefData[component.m_Car].m_Prefab];
-                parameters.m_MaxSpeed.x = carData.m_MaxSpeed;
-                parameters.m_ParkingTarget = componentData1.m_Lane;
-                parameters.m_ParkingDelta = componentData1.m_CurvePosition;
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
-                parameters.m_ParkingSize = VehicleUtils.GetParkingSize(component.m_Car, ref this.m_PrefabRefData, ref this.m_PrefabObjectGeometryData);
-                parameters.m_Methods |= VehicleUtils.GetPathMethods(carData) | PathMethod.Parking;
-                parameters.m_IgnoredRules = VehicleUtils.GetIgnoredPathfindRules(carData);
-                Game.Vehicles.PersonalCar componentData2;
-                // ISSUE: reference to a compiler-generated field
-                if (this.m_PersonalCarData.TryGetComponent(component.m_Car, out componentData2) && (componentData2.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
-                    parameters.m_PathfindFlags |= PathfindFlags.ParkingReset;
+                if (this.m_BicycleOwnerData.TryGetEnabledComponent<BicycleOwner>(resident.m_Citizen, out component2))
+                {
+                    PrefabRef componentData6;
+                    CurrentBuilding componentData7;
+                    // ISSUE: reference to a compiler-generated field
+                    // ISSUE: reference to a compiler-generated field
+                    if (!this.m_PrefabRefData.TryGetComponent(component2.m_Bicycle, out componentData6) && this.m_CurrentBuildingData.TryGetComponent(component2.m_Bicycle, out componentData7) && componentData7.m_CurrentBuilding == property)
+                    {
+                        Unity.Mathematics.Random pseudoRandom = componentData3.GetPseudoRandom(CitizenPseudoRandom.BicycleModel);
+                        // ISSUE: reference to a compiler-generated field
+                        componentData6.m_Prefab = this.m_PersonalCarSelectData.SelectVehiclePrefab(ref pseudoRandom, 1, 0, true, false, true, out Entity _);
+                    }
+                    CarData componentData8;
+                    ObjectGeometryData componentData9;
+                    // ISSUE: reference to a compiler-generated field
+                    // ISSUE: reference to a compiler-generated field
+                    if (this.m_PrefabCarData.TryGetComponent(componentData6.m_Prefab, out componentData8) && this.m_PrefabObjectGeometryData.TryGetComponent(componentData6.m_Prefab, out componentData9))
+                    {
+                        parameters.m_MaxSpeed.x = componentData8.m_MaxSpeed;
+                        parameters.m_ParkingSize = VehicleUtils.GetParkingSize(componentData9, out float _);
+                        parameters.m_Methods |= PathMethod.Bicycle | PathMethod.BicycleParking;
+                        parameters.m_IgnoredRules = VehicleUtils.GetIgnoredPathfindRulesBicycleDefaults();
+                        ParkedCar componentData10;
+                        // ISSUE: reference to a compiler-generated field
+                        if (this.m_ParkedCarData.TryGetComponent(component2.m_Bicycle, out componentData10))
+                        {
+                            parameters.m_ParkingTarget = componentData10.m_Lane;
+                            parameters.m_ParkingDelta = componentData10.m_CurvePosition;
+                            Game.Vehicles.PersonalCar componentData11;
+                            // ISSUE: reference to a compiler-generated field
+                            if (this.m_PersonalCarData.TryGetComponent(component2.m_Bicycle, out componentData11) && (componentData11.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
+                                parameters.m_PathfindFlags |= PathfindFlags.ParkingReset;
+                        }
+                        if (entity1 == property && divert.m_Purpose == Game.Citizens.Purpose.None)
+                        {
+                            destination.m_Methods |= PathMethod.Bicycle;
+                            destination.m_RoadTypes |= RoadTypes.Bicycle;
+                        }
+                    }
+                }
             }
             bool flag = false;
-            TravelPurpose componentData3;
+            TravelPurpose componentData12;
             // ISSUE: reference to a compiler-generated field
-            if (this.m_TravelPurposeData.TryGetComponent(resident.m_Citizen, out componentData3))
+            if (this.m_TravelPurposeData.TryGetComponent(resident.m_Citizen, out componentData12))
             {
-                Game.Citizens.Purpose purpose = componentData3.m_Purpose;
+                Game.Citizens.Purpose purpose = componentData12.m_Purpose;
                 if ((uint)purpose <= 12U)
                 {
                     switch (purpose)
@@ -3991,11 +4036,11 @@ public partial class RPFResidentAISystem : GameSystemBase
                         case Game.Citizens.Purpose.MovingAway:
                             // ISSUE: reference to a compiler-generated field
                             parameters.m_MaxCost = CitizenBehaviorSystem.kMaxMovingAwayCost;
-                            goto label_17;
+                            goto label_28;
                         case Game.Citizens.Purpose.Hospital:
                             break;
                         default:
-                            goto label_17;
+                            goto label_28;
                     }
                 }
                 else
@@ -4004,23 +4049,42 @@ public partial class RPFResidentAISystem : GameSystemBase
                     {
                         case Game.Citizens.Purpose.EmergencyShelter:
                             parameters.m_Weights = new PathfindWeights(1f, 0.2f, 0.0f, 0.1f);
-                            goto label_17;
+                            goto label_28;
                         case Game.Citizens.Purpose.Deathcare:
                             break;
                         default:
-                            goto label_17;
+                            goto label_28;
                     }
                 }
-                HealthProblem componentData4;
+                HealthProblem componentData13;
                 // ISSUE: reference to a compiler-generated field
-                flag = this.m_HealthProblemData.TryGetComponent(resident.m_Citizen, out componentData4) && (componentData4.m_Flags & HealthProblemFlags.RequireTransport) != 0;
+                flag = this.m_HealthProblemData.TryGetComponent(resident.m_Citizen, out componentData13) && (componentData13.m_Flags & HealthProblemFlags.RequireTransport) != 0;
             }
-        label_17:
+        label_28:
+            // ----------------------------------------------------------------
+            // RPF: stochastic route choice using choice_tau
+            // ----------------------------------------------------------------
+            {
+                // Deterministic per-(citizen, path) seed
+                ulong pathId = (ulong)pathOwner.m_ElementIndex;
+                uint seed = RPFRouteUtils.MakeChoiceSeed(resident.m_Citizen, pathId, 1337);
+
+                // Sample Gumbel(0,1) from seed
+                float g = RPFRouteUtils.SampleGumbel01(seed);
+
+                // Small multiplicative bias on the per-path random cost
+                float bias = math.clamp(g * (this.choice_tau / 30f), -0.05f, 0.05f);
+
+                // Randomize the cost perturbation used in route choice
+                destination.m_RandomCost *= (1f + bias);
+            }
+
+
             if ((resident.m_Flags & ResidentFlags.IgnoreBenches) != ResidentFlags.None)
             {
                 destination.m_ActivityMask.m_Mask &= ~new ActivityMask(ActivityType.BenchSitting).m_Mask;
                 destination.m_ActivityMask.m_Mask &= ~new ActivityMask(ActivityType.PullUps).m_Mask;
-        		destination.m_ActivityMask.m_Mask &= ~new ActivityMask(ActivityType.Reading).m_Mask;
+                destination.m_ActivityMask.m_Mask &= ~new ActivityMask(ActivityType.Reading).m_Mask;
             }
             if ((resident.m_Flags & ResidentFlags.IgnoreAreas) != ResidentFlags.None)
             {
@@ -4059,6 +4123,7 @@ public partial class RPFResidentAISystem : GameSystemBase
                 this.m_PathElements[entity].Clear();
             }
         }
+
 
         private void ActivateParkedCar(
           int jobIndex,
@@ -4300,7 +4365,7 @@ public partial class RPFResidentAISystem : GameSystemBase
     public struct BoardingJob : IJob
     {
         [ReadOnly]
-        public ComponentLookup<Citizen> m_Citizens;
+        public ComponentLookup<Unspawned> m_Unspawneds;
         [ReadOnly]
         public ComponentLookup<Game.Objects.Transform> m_Transforms;
         [ReadOnly]
@@ -4321,7 +4386,9 @@ public partial class RPFResidentAISystem : GameSystemBase
     	public ComponentLookup<Owner> m_Owners;
     	[ReadOnly]
     	public ComponentLookup<Game.Objects.OutsideConnection> m_OutsideConnections;
-    	[ReadOnly]
+        [ReadOnly]
+        public ComponentLookup<Bicycle> m_Bicycles;
+        [ReadOnly]
     	public ComponentLookup<HumanCurrentLane> m_HumanCurrentLanes;
     	[ReadOnly]
         public BufferLookup<GroupCreature> m_GroupCreatures;
@@ -4329,6 +4396,9 @@ public partial class RPFResidentAISystem : GameSystemBase
         public BufferLookup<LayoutElement> m_VehicleLayouts;
         [ReadOnly]
         public BufferLookup<ActivityLocationElement> m_ActivityLocations;
+        [NativeDisableParallelForRestriction]
+        public BufferLookup<PlaybackLayer> m_PlaybackLayers;
+        public ComponentLookup<Citizen> m_Citizens;
         public ComponentLookup<Game.Creatures.Resident> m_Residents;
         public ComponentLookup<Creature> m_Creatures;
         public ComponentLookup<Game.Vehicles.Taxi> m_Taxis;
@@ -4407,32 +4477,31 @@ public partial class RPFResidentAISystem : GameSystemBase
           quaternion rotation,
           int ticketPrice)
         {
-            // ISSUE: reference to a compiler-generated field
             this.m_CommandBuffer.RemoveComponent<Relative>(passenger);
-            // ISSUE: reference to a compiler-generated field
             Game.Creatures.Resident resident = this.m_Residents[passenger];
             resident.m_Flags &= ~ResidentFlags.InVehicle;
             resident.m_Timer = 0;
-            // ISSUE: reference to a compiler-generated field
             this.m_Residents[passenger] = resident;
-      		HumanCurrentLane componentData;
-      		// ISSUE: reference to a compiler-generated field
+            DynamicBuffer<PlaybackLayer> bufferData;
+            if (this.m_PlaybackLayers.TryGetBuffer(vehicle, out bufferData) && bufferData.IsCreated)
+            {
+                int length = bufferData.Length;
+                for (int index = 0; index < length; ++index)
+                    bufferData.ElementAt(index).m_RelativeClipTime = 0.0f;
+            }
+            HumanCurrentLane componentData;
       		if (newCurrentLane.m_Lane == Entity.Null && this.m_HumanCurrentLanes.TryGetComponent(leader, out componentData))
       		{
         		newCurrentLane.m_Lane = componentData.m_Lane;
         		newCurrentLane.m_CurvePosition = componentData.m_CurvePosition;
         		newCurrentLane.m_Flags |= componentData.m_Flags & ~CreatureLaneFlags.EmergeUnspawned | CreatureLaneFlags.Leader;
       		}
-            // ISSUE: reference to a compiler-generated field
             if (this.m_LaneObjects.HasBuffer(newCurrentLane.m_Lane))
             {
-                // ISSUE: reference to a compiler-generated field
                 NetUtils.AddLaneObject(this.m_LaneObjects[newCurrentLane.m_Lane], passenger, (float2)newCurrentLane.m_CurvePosition.x);
             }
             else
             {
-                // ISSUE: reference to a compiler-generated field
-                // ISSUE: reference to a compiler-generated field
                 ObjectGeometryData geometryData = this.m_ObjectGeometryData[this.m_PrefabRefData[passenger].m_Prefab];
                 Bounds3 bounds = ObjectUtils.CalculateBounds(position, quaternion.identity, geometryData);
 
@@ -4767,10 +4836,12 @@ public partial class RPFResidentAISystem : GameSystemBase
             local1.m_Flags &= ~(ResidentFlags.WaitingTransport | ResidentFlags.NoLateDeparture);
             local1.m_Flags |= ResidentFlags.InVehicle;
             local1.m_Timer = 0;
-            // ISSUE: reference to a compiler-generated field
             this.m_Queues[passenger].Clear();
-            // ISSUE: reference to a compiler-generated field
             this.m_CommandBuffer.AddComponent<CurrentVehicle>(passenger, new CurrentVehicle(vehicle, flags));
+            if (!this.m_Unspawneds.HasComponent(vehicle) || this.m_Unspawneds.HasComponent(passenger))
+                return;
+            this.m_CommandBuffer.AddComponent<Unspawned>(passenger, new Unspawned());
+            this.m_CommandBuffer.AddComponent<BatchesUpdated>(passenger, new BatchesUpdated());
         }
 
         private void CancelEnterVehicle(
@@ -4778,8 +4849,6 @@ public partial class RPFResidentAISystem : GameSystemBase
           Entity passenger,
           Entity vehicle)
         {
-            // ISSUE: reference to a compiler-generated field
-            // ISSUE: reference to a compiler-generated field
             if (this.m_Passengers.HasBuffer(vehicle) && CollectionUtils.RemoveValue<Passenger>(this.m_Passengers[vehicle], new Passenger(passenger)))
             {
                 // ISSUE: reference to a compiler-generated method
@@ -4844,22 +4913,20 @@ public partial class RPFResidentAISystem : GameSystemBase
           }
                 }
             }
-            // ISSUE: reference to a compiler-generated field
             Creature creature = this.m_Creatures[passenger] with
             {
                 m_QueueEntity = Entity.Null,
                 m_QueueArea = new Sphere3()
             };
-            // ISSUE: reference to a compiler-generated field
             this.m_Creatures[passenger] = creature;
-            // ISSUE: reference to a compiler-generated field
+
             this.m_Queues[passenger].Clear();
-      		Citizen componentData;
-            // ISSUE: reference to a compiler-generated field
-            // ISSUE: reference to a compiler-generated field
-      		if (this.m_Citizens.TryGetComponent(this.m_Residents[passenger].m_Citizen, out componentData))
+            Game.Creatures.Resident resident = this.m_Residents[passenger];
+            Citizen componentData;
+
+            if (this.m_Citizens.TryGetComponent(resident.m_Citizen, out componentData))
             {
-        		PassengerType parameter = (componentData.m_State & CitizenFlags.Tourist) != CitizenFlags.None ? PassengerType.Tourist : PassengerType.Citizen;
+                PassengerType parameter = (componentData.m_State & CitizenFlags.Tourist) != CitizenFlags.None ? PassengerType.Tourist : PassengerType.Citizen;
                 switch (transportType)
                 {
                     case TransportType.Bus:
@@ -4894,6 +4961,14 @@ public partial class RPFResidentAISystem : GameSystemBase
             			// ISSUE: reference to a compiler-generated method
             			this.EnqueueStat(StatisticType.PassengerCountFerry, 1, (int) parameter);
             			break;
+                }
+                if (this.m_PrefabPersonalCarData.HasComponent(prefabRef.m_Prefab))
+                {
+                    if (this.m_Bicycles.HasComponent(vehicle))
+                        componentData.m_State |= CitizenFlags.BicycleUser;
+                    else
+                        componentData.m_State &= ~CitizenFlags.BicycleUser;
+                    this.m_Citizens[resident.m_Citizen] = componentData;
                 }
             }
             // ISSUE: reference to a compiler-generated field
@@ -4957,10 +5032,11 @@ public partial class RPFResidentAISystem : GameSystemBase
         {
             relative = new Relative();
             DynamicBuffer<ActivityLocationElement> bufferData;
-            // ISSUE: reference to a compiler-generated field
+
             if (this.m_ActivityLocations.TryGetBuffer(prefab, out bufferData))
             {
                 ActivityMask activityMask = new ActivityMask(ActivityType.Driving);
+                activityMask.m_Mask |= new ActivityMask(ActivityType.Biking).m_Mask;
                 for (int index = 0; index < bufferData.Length; ++index)
                 {
                     ActivityLocationElement activityLocationElement = bufferData[index];
@@ -5227,6 +5303,8 @@ public partial class RPFResidentAISystem : GameSystemBase
         [ReadOnly]
         public ComponentLookup<CarKeeper> __Game_Citizens_CarKeeper_RO_ComponentLookup;
         [ReadOnly]
+        public ComponentLookup<BicycleOwner> __Game_Citizens_BicycleOwner_RO_ComponentLookup;
+        [ReadOnly]
         public ComponentLookup<HealthProblem> __Game_Citizens_HealthProblem_RO_ComponentLookup;
         [ReadOnly]
         public ComponentLookup<TravelPurpose> __Game_Citizens_TravelPurpose_RO_ComponentLookup;
@@ -5430,7 +5508,7 @@ public partial class RPFResidentAISystem : GameSystemBase
             this.__Game_Citizens_Worker_RO_ComponentLookup = state.GetComponentLookup<Worker>(true);
             // ISSUE: reference to a compiler-generated field
             this.__Game_Citizens_CarKeeper_RO_ComponentLookup = state.GetComponentLookup<CarKeeper>(true);
-            // ISSUE: reference to a compiler-generated field
+            this.__Game_Citizens_BicycleOwner_RO_ComponentLookup = state.GetComponentLookup<BicycleOwner>(true);
             this.__Game_Citizens_HealthProblem_RO_ComponentLookup = state.GetComponentLookup<HealthProblem>(true);
             // ISSUE: reference to a compiler-generated field
             this.__Game_Citizens_TravelPurpose_RO_ComponentLookup = state.GetComponentLookup<TravelPurpose>(true);
