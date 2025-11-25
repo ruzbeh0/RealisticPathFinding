@@ -14,7 +14,7 @@ using Unity.Entities;
 namespace RealisticPathFinding
 {
     [FileLocation("ModsSettings\\" + nameof(RealisticPathFinding) + "\\" + nameof(RealisticPathFinding))]
-    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, TaxiGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup, OtherGroup)]
+    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, BicycleGroup, TaxiGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup, OtherGroup)]
     [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup)]
     public class Setting : ModSetting
     {
@@ -22,10 +22,12 @@ namespace RealisticPathFinding
         public const string TransitSection = "Transit";
         public const string TaxiSection = "Taxi";
         public const string VehicleSection = "Vehicles";
+        public const string BicyclesSection = "Bicycles";
         public const string WaitingTimeGroup = "WaitingTine";
         public const string ModeWeightGroup = "ModeWeight";
         public const string BusLaneGroup = "BusLaneGroup";
         public const string PedestrianGroup = "Pedestrians";
+        public const string BicycleGroup = "Bicycles";
         public const string TaxiGroup = "Taxi";
         public const string LongDistanceGroup = "LongDistanceGroup";
         public const string PedestrianCrossingGroup = "PedestrianCrossingGroup";
@@ -82,12 +84,20 @@ namespace RealisticPathFinding
             cong_min_ff_mps = 1f;
             disable_ped_cost = false;
             taxi_passengers_waiting_threashold = 7f;
-            taxi_fare_increase = 0.3f;
+            taxi_fare_increase = 2f;
             ped_crosswalk_factor = 0.7f;
             ped_unsafe_crosswalk_factor = 1f;
             ferry_mode_weight = 1f;
             nonbus_buslane_penalty_sec = 30f;
             choice_tau_sec = 4f;
+            bike_short_comfort_m = 500f;  // under 300m, bikes are penalized
+            bike_short_min_mult = 0.3f;  // at 0m, treat bike as 70% worse
+            bike_long_comfort_m = 3000f; // start penalizing above 3km
+            bike_long_ramp_m = 4000f; // ramp fully by +3km
+            bike_long_min_mult = 0.3f;  // at very long distances treat bike as 50% slower
+            bike_teen_percent = 40;
+            bike_adult_percent = 25;
+            bike_senior_percent = 10;
         }
 
         [SettingsUISlider(min = 0.5f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
@@ -179,7 +189,7 @@ namespace RealisticPathFinding
         [SettingsUISection(TaxiSection, TaxiGroup)]
         public float taxi_passengers_waiting_threashold { get; set; }
 
-        [SettingsUISlider(min = 0f, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISlider(min = 0f, max = 10f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TaxiSection, TaxiGroup)]
         public float taxi_fare_increase { get; set; }
 
@@ -223,7 +233,7 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
         public float ped_crosswalk_factor { get; set; }
 
-        [SettingsUISlider(min = 0.1f, max = 5f, step = 0.05f)]
+        [SettingsUISlider(min = 0.1f, max = 10f, step = 0.05f)]
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
         public float ped_unsafe_crosswalk_factor { get; set; }
 
@@ -252,11 +262,50 @@ namespace RealisticPathFinding
         [SettingsUISection(VehicleSection, CongestionGroup)]
         public float cong_min_sample_sec { get; set; }
 
+        // Teens (roughly 13–18)
+        [SettingsUISlider(min = 0, max = 100, step = 5f, scalarMultiplier = 1, unit = Unit.kPercentage)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public int bike_teen_percent { get; set; }
+
+        // Adults (working age)
+        [SettingsUISlider(min = 0, max = 100, step = 5f, scalarMultiplier = 1, unit = Unit.kPercentage)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public int bike_adult_percent { get; set; }
+
+        // Seniors (elderly)
+        [SettingsUISlider(min = 0, max = 100, step = 5f, scalarMultiplier = 1, unit = Unit.kPercentage)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public int bike_senior_percent { get; set; }
+
+
+        [SettingsUISlider(min = 0, max = 1000, step = 50f, scalarMultiplier = 1, unit = Unit.kInteger)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public float bike_short_comfort_m { get; set; }
+
+        [SettingsUISlider(min = 0.1f, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public float bike_short_min_mult { get; set; }
+
+        [SettingsUISlider(min = 500, max = 10000, step = 100f, scalarMultiplier = 1, unit = Unit.kInteger)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public float bike_long_comfort_m { get; set; }
+
+        [SettingsUISlider(min = 0, max = 10000, step = 100f, scalarMultiplier = 1, unit = Unit.kInteger)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public float bike_long_ramp_m { get; set; }
+
+        [SettingsUISlider(min = 0.1f, max = 1f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(BicyclesSection, BicycleGroup)]
+        public float bike_long_min_mult { get; set; }
+
         // --- Stochastic route choice (cars) ---
 
         [SettingsUISlider(min = 0f, max = 30f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(OtherSection, OtherGroup)]
         public float choice_tau_sec { get; set; }   // "temperature" in seconds
+
+        
+
 
 
         [SettingsUIButton]
@@ -291,6 +340,7 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionTabLocaleID(Setting.PedestriansSection), "Pedestrians" },
             { m_Setting.GetOptionTabLocaleID(Setting.TaxiSection), "Taxi" },
             { m_Setting.GetOptionTabLocaleID(Setting.OtherSection), "Other" },
+            { m_Setting.GetOptionTabLocaleID(Setting.BicyclesSection),     "Bicycles" },
 
             // ----- Groups (shown inside each section) -----
             // NOTE: your constant is 'WaitingTine' (typo); label shows fine as "Waiting time".
@@ -311,6 +361,7 @@ namespace RealisticPathFinding
             // Group (under Pedestrians)
             { m_Setting.GetOptionGroupLocaleID(Setting.LongDistanceGroup), "Long-distance walking" },
             { m_Setting.GetOptionGroupLocaleID(Setting.PedestrianCrossingGroup), "Crossings" },
+            { m_Setting.GetOptionGroupLocaleID(Setting.BicycleGroup),     "Bicycles" },
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.car_mode_weight)), "Car perceived-time weight" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.car_mode_weight)), "Multiplier on in-vehicle car time used for route choice. 1.0 = neutral; less than 1.0 makes driving feel faster, more than 1.0 makes it feel slower." },
@@ -332,6 +383,28 @@ namespace RealisticPathFinding
               "Scheduled-mode wait factor" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.scheduled_wt_factor)),
               "Multiplier for scheduled modes (rail/ship/air). Example: 0.5 halves perceived waiting for those modes." },
+
+            // Bicycles → age-specific ownership shares
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_teen_percent)),
+              "Teens with bicycle access (%)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_teen_percent)),
+              "Approximate share of teen citizens who are allowed to use bicycles. "
+            + "0 = no teens use bikes. 100 = all eligible teens may use bikes (subject to vanilla constraints)." },
+            
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_adult_percent)),
+              "Adults with bicycle access (%)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_adult_percent)),
+              "Approximate share of adult citizens who are allowed to use bicycles. "
+            + "0 = no adults use bikes. 100 = all eligible adults may use bikes (subject to vanilla constraints)." },
+            
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_senior_percent)),
+              "Seniors with bicycle access (%)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_senior_percent)),
+              "Approximate share of elderly citizens who are allowed to use bicycles. "
+            + "0 = no seniors use bikes. 100 = all eligible seniors may use bikes (subject to vanilla constraints)." },
+            
+            
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_factor)),
                     "Crowding factor (max extra wait)" },
@@ -503,6 +576,36 @@ namespace RealisticPathFinding
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.choice_tau_sec)), "Stochastic choice temperature (s)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.choice_tau_sec)), "One value used for all modes. Higher = more randomness (broader splits among near-equal routes); lower = more deterministic." },
+
+            // Short-trip comfort distance
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_short_comfort_m)),
+              "Short-trip comfort distance (m)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_short_comfort_m)),
+              "Below this origin→destination straight-line distance (meters), bicycling is penalized so walking is preferred. The penalty ramps down as distance approaches this value." },
+            
+            // Short-trip minimum multiplier
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_short_min_mult)),
+              "Short-trip minimum speed multiplier" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_short_min_mult)),
+              "Perceived bike speed multiplier for very short trips (distance near zero). Example: 0.3 = treat short bike trips as if cycling 70% slower than normal, encouraging walking instead." },
+            
+            // Long-trip comfort distance
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_long_comfort_m)),
+              "Long-trip comfort distance (m)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_long_comfort_m)),
+              "Up to this origin→destination straight-line distance (meters) there is no long-trip penalty for bicycling. Beyond this, long bike trips are gradually discouraged." },
+            
+            // Long-trip ramp length
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_long_ramp_m)),
+              "Long-trip ramp length (m)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_long_ramp_m)),
+              "Over the next meters after the long-trip comfort distance, the perceived bike speed multiplier ramps down towards the minimum. Full effect at comfort distance + ramp length." },
+            
+            // Long-trip minimum multiplier
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bike_long_min_mult)),
+              "Long-trip minimum speed multiplier" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.bike_long_min_mult)),
+              "Floor for perceived bike speed on very long trips. Example: 0.5 = treat very long bike ODs as if cycling 50% slower, encouraging public transport or car instead." },
 
         };
 

@@ -286,6 +286,11 @@ public partial class RPFResidentAISystem : GameSystemBase
             RampMeters = ramp,
             MinSpeedMult = minMult,
             choice_tau = Mod.m_Setting.choice_tau_sec,
+            bike_short_comfort_m = Mod.m_Setting.bike_short_comfort_m,
+            bike_short_min_mult = Mod.m_Setting.bike_short_min_mult,
+            bike_long_comfort_m = Mod.m_Setting.bike_long_comfort_m,
+            bike_long_ramp_m = Mod.m_Setting.bike_long_ramp_m,
+            bike_long_min_mult = Mod.m_Setting.bike_long_min_mult,
             t2w_timefactor = Time2WorkInterop.GetFactor(),
             waiting_weight = Mod.m_Setting.waiting_time_factor,
             m_PathfindQueue = this.m_PathfindSetupSystem.GetQueue((object)this, 64 /*0x40*/).AsParallelWriter(),
@@ -293,23 +298,44 @@ public partial class RPFResidentAISystem : GameSystemBase
             m_ActionQueue = this.m_Actions.m_ActionQueue.AsParallelWriter(),
             m_CommandBuffer = this.m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter()
         };
-        // ISSUE: reference to a compiler-generated field
+
         JobHandle dependsOn = jobData.ScheduleParallel<RPFResidentAISystem.ResidentTickJob>(this.m_CreatureQuery, JobHandle.CombineDependencies(this.Dependency, jobHandle1));
-        // ISSUE: reference to a compiler-generated field
         jobData.m_GroupMember = true;
-        // ISSUE: reference to a compiler-generated field
         JobHandle jobHandle2 = jobData.ScheduleParallel<RPFResidentAISystem.ResidentTickJob>(this.m_GroupCreatureQuery, dependsOn);
-        // ISSUE: reference to a compiler-generated field
         this.m_PersonalCarSelectData.PostUpdate(jobHandle2);
-        // ISSUE: reference to a compiler-generated field
-        // ISSUE: reference to a compiler-generated method
         this.m_PathfindSetupSystem.AddQueueWriter(jobHandle2);
-        // ISSUE: reference to a compiler-generated field
         this.m_EndFrameBarrier.AddJobHandleForProducer(jobHandle2);
-        // ISSUE: reference to a compiler-generated field
-        // ISSUE: reference to a compiler-generated field
         this.m_Actions.m_Dependency = jobHandle2;
         this.Dependency = jobHandle2;
+    }
+
+    private static float GetBikeDistanceMult(
+    float odMeters,
+    float shortComfort,
+    float shortMin,
+    float longComfort,
+    float longRamp,
+    float longMin)
+    {
+        if (odMeters <= 0f)
+            return 1f;
+
+        // 1) Very short trips → ramp from shortMin up to 1
+        if (odMeters < shortComfort && shortComfort > 1f)
+        {
+            float t = math.saturate(odMeters / shortComfort);
+            return math.lerp(shortMin, 1f, t);
+        }
+
+        // 2) Long trips → ramp from 1 down to longMin
+        if (odMeters > longComfort && longRamp > 0f)
+        {
+            float t = math.saturate((odMeters - longComfort) / longRamp);
+            return math.lerp(1f, longMin, t);
+        }
+
+        // 3) Medium trips → neutral
+        return 1f;
     }
 
 
@@ -769,7 +795,14 @@ public partial class RPFResidentAISystem : GameSystemBase
         public float ComfortMeters;
         public float RampMeters;
         public float MinSpeedMult;
+        public float bike_short_comfort_m;
+        public float bike_short_min_mult;
+        public float bike_long_comfort_m;
+        public float bike_long_ramp_m;
+        public float bike_long_min_mult;
         public float choice_tau;
+        public float bike_time_factor;
+
 
         public void Execute(
           in ArchetypeChunk chunk,
@@ -3996,22 +4029,43 @@ public partial class RPFResidentAISystem : GameSystemBase
                     }
                     CarData componentData8;
                     ObjectGeometryData componentData9;
-                    // ISSUE: reference to a compiler-generated field
-                    // ISSUE: reference to a compiler-generated field
+
                     if (this.m_PrefabCarData.TryGetComponent(componentData6.m_Prefab, out componentData8) && this.m_PrefabObjectGeometryData.TryGetComponent(componentData6.m_Prefab, out componentData9))
                     {
                         parameters.m_MaxSpeed.x = componentData8.m_MaxSpeed;
+                        // We already computed originXZ / destXZ for walking above.
+                        float dist = math.distance(originXZ, destXZ);
+                        if (dist > 0.1f)
+                        {
+                            float bikeMult = GetBikeDistanceMult(
+                                odMeters,
+                                this.bike_short_comfort_m,
+                                this.bike_short_min_mult,
+                                this.bike_long_comfort_m,
+                                this.bike_long_ramp_m,
+                                this.bike_long_min_mult);
+                            // Lower multiplier = effectively slower bike = less attractive
+                            float baseBike = parameters.m_MaxSpeed.x;
+                            float newBike = baseBike * bikeMult;
+                            parameters.m_MaxSpeed.x = newBike;
+                        }
+
+                        if (this.bike_time_factor > 0.01f && math.abs(this.bike_time_factor - 1f) > 0.001f)
+                        {
+                            parameters.m_MaxSpeed.x /= this.bike_time_factor;
+                        }
+
                         parameters.m_ParkingSize = VehicleUtils.GetParkingSize(componentData9, out float _);
                         parameters.m_Methods |= PathMethod.Bicycle | PathMethod.BicycleParking;
                         parameters.m_IgnoredRules = VehicleUtils.GetIgnoredPathfindRulesBicycleDefaults();
                         ParkedCar componentData10;
-                        // ISSUE: reference to a compiler-generated field
+
                         if (this.m_ParkedCarData.TryGetComponent(component2.m_Bicycle, out componentData10))
                         {
                             parameters.m_ParkingTarget = componentData10.m_Lane;
                             parameters.m_ParkingDelta = componentData10.m_CurvePosition;
                             Game.Vehicles.PersonalCar componentData11;
-                            // ISSUE: reference to a compiler-generated field
+
                             if (this.m_PersonalCarData.TryGetComponent(component2.m_Bicycle, out componentData11) && (componentData11.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
                                 parameters.m_PathfindFlags |= PathfindFlags.ParkingReset;
                         }

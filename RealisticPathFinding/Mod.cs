@@ -69,6 +69,8 @@ namespace RealisticPathFinding
             
             updateSystem.UpdateAt<RealisticPathFinding.Systems.TaxiStandCrowdingSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarCongestionEwmaSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.BicycleOwnerLimiterSystem>(SystemUpdatePhase.GameSimulation);
+
 
             //Harmony
             var harmony = new Harmony(harmonyID);
