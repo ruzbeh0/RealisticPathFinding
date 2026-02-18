@@ -54,18 +54,15 @@ This mod is not compatible with Lazy Pedestrians
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/realistic-pathfinding-mod.1861163/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.7" />
+	<ModVersion Value="0.7.2" />
 	<!--Recommended version of the base game to use the mod-->
-	<GameVersion Value="1.4.*" />
+	<GameVersion Value="1.5.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Required DLC, can be set multiple times. Supported values are "Landmark Buildings", "San Fransisco Set", "Beach Properties", "Urban Promenades", "Modern Architecture"-->
 	<RequiredDLC Value="" />
 	<ChangeLog>
-* Added bike usage shares by age group
-* Added bike penalties for long and short trips
-* Increased limit for taxi fare increase
-* Increased limit for unsafe crosswalk penalty
+* Fixed issue with bicycle ownership when input parameters are 100%
 	</ChangeLog>
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon-->
 	<ExternalLink Type="github" Url="https://github.com/ruzbeh0/RealisticPathFinding" />

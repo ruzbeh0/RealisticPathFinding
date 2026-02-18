@@ -47,10 +47,6 @@ namespace RealisticPathFinding.Systems
             int adultPercent = math.clamp(settings.bike_adult_percent, 0, 100);
             int seniorPercent = math.clamp(settings.bike_senior_percent, 0, 100);
 
-            // If all groups are at 100%, we don't need to touch anything.
-            if (teenPercent >= 100 && adultPercent >= 100 && seniorPercent >= 100)
-                return;
-
             var job = new LimitBicycleOwnersJob
             {
                 EntityType = GetEntityTypeHandle(),
@@ -127,10 +123,6 @@ namespace RealisticPathFinding.Systems
                             break;
                     }
 
-                    // 100% -> we don't change anything for that age group
-                    if (threshold >= 100)
-                        continue;
-
                     // 0% -> disable BicycleOwner for everyone in this age group
                     if (threshold <= 0)
                     {
@@ -141,15 +133,19 @@ namespace RealisticPathFinding.Systems
                     // Deterministic "random" 0..99 from entity index
                     uint idx = (uint)e.Index;
                     uint hash = idx * 1103515245u + 12345u;
+                    // Hash into 0–99
                     uint value = hash % 100u;
 
-                    // If this citizen falls OUTSIDE the allowed share, disable ownership.
-                    // If they fall inside, we do nothing and keep whatever vanilla decided
-                    // (enabled or disabled).
-                    if (value >= (uint)threshold)
-                    {
-                        CommandBuffer.SetComponentEnabled<BicycleOwner>(unfilteredChunkIndex, e, false);
-                    }
+                    // Deterministic assignment based on the current share.
+                    // value < threshold  → this citizen is in the bicycle-owning share
+                    // value >= threshold → this citizen is out of the share
+                    bool shouldHaveBike = value < (uint)threshold;
+
+                    // Enforce the enabled state accordingly.
+                    // NOTE: we already skipped citizens with an actual bicycle entity
+                    //       (bo.m_Bicycle != Entity.Null) earlier in Execute.
+                    CommandBuffer.SetComponentEnabled<BicycleOwner>(unfilteredChunkIndex, e, shouldHaveBike);
+
                 }
             }
         }
