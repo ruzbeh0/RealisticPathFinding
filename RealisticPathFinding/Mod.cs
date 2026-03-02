@@ -40,13 +40,13 @@ namespace RealisticPathFinding
 
             AssetDatabase.global.LoadSettings(nameof(RealisticPathFinding), m_Setting, new Setting(this));
 
-            //bool realisticTripsMod = false;
+            bool realisticTripsMod = false;
             foreach (var modInfo in GameManager.instance.modManager)
             {
                 if (modInfo.asset.name.Equals("Time2Work"))
                 {
                     Mod.log.Info($"Loaded Realistic Trips Mod with time factor: {Time2WorkInterop.GetFactor()}");
-                    //realisticTripsMod = true;
+                    realisticTripsMod = true;
                 }
             }
 
