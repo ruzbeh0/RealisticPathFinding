@@ -151,7 +151,7 @@ namespace RealisticPathFinding.Utils
                 var wp = waitingPassengersData[pathElement.m_Target];
                 if (waitingPassengersData.HasComponent(pathElement.m_Target))
                 {
-                    seconds += wp.m_AverageWaitingTime; // already in seconds
+                    seconds += (int)(wp.m_AverageWaitingTime / t2w_timefactor); // already in seconds
 
                     // --- crowding factor using capacity normalization ---
                     float crowdingFactor = 1f;
@@ -200,7 +200,7 @@ namespace RealisticPathFinding.Utils
                         lastTransportType = componentData.m_TransportType;
                     }
 
-                    seconds -= wp.m_AverageWaitingTime; // subtract wating time already counted by the game in PathUtils
+                    seconds -= (int)(wp.m_AverageWaitingTime / t2w_timefactor); // subtract wating time already counted by the game in PathUtils
 
                     if(seconds < 0)
                     {

@@ -40,13 +40,13 @@ namespace RealisticPathFinding
 
             AssetDatabase.global.LoadSettings(nameof(RealisticPathFinding), m_Setting, new Setting(this));
 
-            bool realisticTripsMod = false;
+            //bool realisticTripsMod = false;
             foreach (var modInfo in GameManager.instance.modManager)
             {
                 if (modInfo.asset.name.Equals("Time2Work"))
                 {
                     Mod.log.Info($"Loaded Realistic Trips Mod with time factor: {Time2WorkInterop.GetFactor()}");
-                    realisticTripsMod = true;
+                    //realisticTripsMod = true;
                 }
             }
 
@@ -54,12 +54,11 @@ namespace RealisticPathFinding
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem>().Enabled = false;
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResidentAISystem.Actions>().Enabled = false;
             World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.TripNeededSystem>().Enabled = false;
-            if (!realisticTripsMod)
-            {
-                World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResourceBuyerSystem>().Enabled = false;
-            }
+            //if (!realisticTripsMod)
+            World.DefaultGameObjectInjectionWorld.GetOrCreateSystemManaged<Game.Simulation.ResourceBuyerSystem>().Enabled = false;
 
-            updateSystem.UpdateAfter<RealisticPathFinding.Systems.ScaleWaitingTimesSystem, Game.Simulation.WaitingPassengersSystem>(SystemUpdatePhase.GameSimulation);
+
+            //updateSystem.UpdateAfter<RealisticPathFinding.Systems.ScaleWaitingTimesSystem, Game.Simulation.WaitingPassengersSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<RealisticPathFinding.Systems.RPFResidentActionsSystem, RealisticPathFinding.Systems.RPFResidentAISystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<Game.Simulation.UpdateGroupSystem,
@@ -78,8 +77,8 @@ namespace RealisticPathFinding
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarCongestionEwmaSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.BicycleOwnerLimiterSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.RPFTripNeededSystem>(SystemUpdatePhase.GameSimulation);
-            if(!realisticTripsMod)
-                updateSystem.UpdateAt<RealisticPathFinding.Systems.RPFResourceBuyerSystem>(SystemUpdatePhase.GameSimulation);
+            //if(!realisticTripsMod) 
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.RPFResourceBuyerSystem>(SystemUpdatePhase.GameSimulation);
 
 
             //Harmony

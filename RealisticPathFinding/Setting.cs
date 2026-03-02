@@ -212,7 +212,7 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         public bool disable_ped_cost { get; set; }
 
-        [SettingsUISlider(min = 1f, max = 50f, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 1f, max = 50f, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(disable_ped_cost))]
         public float ped_walk_time_factor { get; set; }
@@ -229,11 +229,11 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, LongDistanceGroup)]
         public float walk_long_min_mult { get; set; }
 
-        [SettingsUISlider(min = 0.1f, max = 5f, step = 0.05f)]
+        [SettingsUISlider(min = 0.1f, max = 5f, step = 0.05f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
         public float ped_crosswalk_factor { get; set; }
 
-        [SettingsUISlider(min = 0.1f, max = 10f, step = 0.05f)]
+        [SettingsUISlider(min = 0.1f, max = 10f, step = 0.05f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
         public float ped_unsafe_crosswalk_factor { get; set; }
 
