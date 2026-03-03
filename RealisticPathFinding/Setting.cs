@@ -75,7 +75,7 @@ namespace RealisticPathFinding
             walk_long_comfort_m = 600f;
             walk_long_ramp_m = 700f;
             walk_long_min_mult = 0.3f;
-            ped_walk_time_factor = 5.0f;
+            ped_walk_time_factor = 1.0f;
             cong_min_sample_sec = 0.2f;
             cong_alpha = 0.15f;
             cong_min_push_sec = 0.5f;
@@ -212,7 +212,7 @@ namespace RealisticPathFinding
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         public bool disable_ped_cost { get; set; }
 
-        [SettingsUISlider(min = 1f, max = 50f, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 1f, max = 50f, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(PedestriansSection, PedestrianGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(disable_ped_cost))]
         public float ped_walk_time_factor { get; set; }
