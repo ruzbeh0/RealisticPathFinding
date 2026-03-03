@@ -47,7 +47,8 @@ using PrefabResident = Game.Prefabs.Resident;
 
 
 #nullable disable
-namespace RealisticPathFinding.Systems;
+namespace RealisticPathFinding.Systems
+{
 
 //[CompilerGenerated]
 public partial class RPFResidentAISystem : GameSystemBase
@@ -4967,11 +4968,10 @@ public partial class RPFResidentAISystem : GameSystemBase
           }
                 }
             }
-            Creature creature = this.m_Creatures[passenger] with
-            {
-                m_QueueEntity = Entity.Null,
-                m_QueueArea = new Sphere3()
-            };
+            Creature creature = this.m_Creatures[passenger];
+            creature.m_QueueEntity = Entity.Null;
+            creature.m_QueueArea = new Sphere3();
+
             this.m_Creatures[passenger] = creature;
 
             this.m_Queues[passenger].Clear();
@@ -5241,10 +5241,8 @@ public partial class RPFResidentAISystem : GameSystemBase
             {
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
-                HouseholdNeed householdNeed = this.m_HouseholdNeedData[action.m_Household] with
-                {
-                    m_Resource = Resource.NoResource
-                };
+                HouseholdNeed householdNeed = this.m_HouseholdNeedData[action.m_Household];
+                householdNeed.m_Resource = Resource.NoResource;
                 // ISSUE: reference to a compiler-generated field
                 // ISSUE: reference to a compiler-generated field
                 this.m_HouseholdNeedData[action.m_Household] = householdNeed;
@@ -5670,4 +5668,5 @@ public partial class RPFResidentAISystem : GameSystemBase
             this.__Game_Pathfind_PathElement_RW_BufferLookup = state.GetBufferLookup<PathElement>();
         }
     }
+}
 }
