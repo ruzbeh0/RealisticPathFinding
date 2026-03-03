@@ -23,7 +23,7 @@ namespace RealisticPathFinding
         public const string TaxiSection = "Taxi";
         public const string VehicleSection = "Vehicles";
         public const string BicyclesSection = "Bicycles";
-        public const string WaitingTimeGroup = "WaitingTine";
+        public const string WaitingTimeGroup = "WaitingTime";
         public const string ModeWeightGroup = "ModeWeight";
         public const string BusLaneGroup = "BusLaneGroup";
         public const string PedestrianGroup = "Pedestrians";
@@ -90,11 +90,11 @@ namespace RealisticPathFinding
             ferry_mode_weight = 1f;
             nonbus_buslane_penalty_sec = 30f;
             choice_tau_sec = 4f;
-            bike_short_comfort_m = 500f;  // under 300m, bikes are penalized
+            bike_short_comfort_m = 500f;  // under 500m, bikes are penalized
             bike_short_min_mult = 0.3f;  // at 0m, treat bike as 70% worse
             bike_long_comfort_m = 3000f; // start penalizing above 3km
-            bike_long_ramp_m = 4000f; // ramp fully by +3km
-            bike_long_min_mult = 0.3f;  // at very long distances treat bike as 50% slower
+            bike_long_ramp_m = 4000f; // ramp fully by +4km
+            bike_long_min_mult = 0.3f;  // at very long distances treat bike as 70% slower
             bike_teen_percent = 40;
             bike_adult_percent = 25;
             bike_senior_percent = 10;
@@ -137,7 +137,7 @@ namespace RealisticPathFinding
         [SettingsUISection(VehicleSection, RoadBiasGroup)]
         public float alleyway_bias { get; set; }
 
-        [SettingsUISlider(min = 0, max = 1, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 0, max = 2, step = 0.1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
         [SettingsUISection(TransitSection, WaitingTimeGroup)]
         public float waiting_time_factor { get; set; } 
 
@@ -409,19 +409,19 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_factor)),
                     "Crowding factor (max extra wait)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_factor)),
-                    "At high crowding (half of vehicle capacity waiting), increase perceived wait by up to this fraction (0.0–0.5). Example: 0.15 = +15% at/above capacity; 0 disables crowding." },
+                    "At high crowding (configurable), increase perceived wait time. Example: 0.15 = +15%, 2.0 = +200% at/above capacity; 0 disables crowding entirely." },
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_stop_threashold)),
                       "Crowding threshold (load ratio)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_stop_threashold)),
-                     "Applies crowding delay when the number of people at a stop exceeds this fraction of vehicle capacity (0–1). Example: 0.5 means crowding begins when the stop is half a vehicle’s capacity." },
+                     "Applies crowding penalty when the number of people at a stop reaches or exceeds this fraction of vehicle capacity (0–1). Example: 0.5 means crowding begins when the stop is half a vehicle’s capacity." },
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)), "Non-bus on bus-only lane penalty (s)" },
-            { m_Setting.GetOptionDescLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)),  "Extra behavior time per bus-only segment for non-bus vehicles. 0 = off." },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)),  "Extra time penalty per bus-only segment for non-bus vehicles. 0 = off." },
 
             // ============================
             // Transit → Mode weights group
             // ============================
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.bus_mode_weight)),
-              "Bus in-vehicle time Weight" },
+              "Bus in-vehicle time weight" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.bus_mode_weight)),
               "Multiplier applied to bus in-vehicle time (1.0 = no change)." },
 
@@ -433,7 +433,7 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.subway_mode_weight)),
               "Subway in-vehicle time weight" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.subway_mode_weight)),
-              "Multiplier applied to subway/metro in-vehicle time." },
+              "Multiplier applied to subway in-vehicle time." },
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.train_mode_weight)),
               "Train in-vehicle time weight" },
@@ -443,7 +443,7 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.ferry_mode_weight)),
               "Ferry in-vehicle time weight" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.ferry_mode_weight)),
-              "Multiplier applied to Ferry/metro in-vehicle time." },
+              "Multiplier applied to ferry in-vehicle time." },
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Feeder→Trunk transfer penalty" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.feeder_trunk_transfer_penalty)), "Multiplier applied to the wait time when transferring from a feeder mode (bus/tram) to a trunk mode (metro/train/ship/plane). Use 1.0 for no extra penalty; values < 1.0 reduce hassle, > 1.0 increase it." },
@@ -459,7 +459,7 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.taxi_fare_increase)),
               "Crowding fare increase" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.taxi_fare_increase)),
-              "Extra fraction added to the starting fee when the stand is crowded. Example: 0.20 = +20% starting fee when the threshold is exceeded." },
+              "Extra multiplier applied to the starting fare when waiting passengers exceed the threshold. Example: 0.20 = +20% increase; 0 = no increase." },
 
             // ============================
             // Pedestrians → Speeds group
@@ -541,8 +541,8 @@ namespace RealisticPathFinding
             "Walking cost multiplier" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.ped_walk_time_factor)),
             "Multiplies the pedestrian walking cost. 1.0 = no change; higher values make walking less attractive overall." },
-            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.disable_ped_cost)), "Disable Walking cost multiplier" },
-                { m_Setting.GetOptionDescLocaleID(nameof(Setting.disable_ped_cost)), $"Disable Walking cost multiplier. This will make this mod more compatible with other mods that affect pedestrian Path Finding" },
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.disable_ped_cost)), "Disable walking cost multiplier" },
+                { m_Setting.GetOptionDescLocaleID(nameof(Setting.disable_ped_cost)), $"Disable walking cost multiplier. This will make this mod more compatible with other mods that affect pedestrian pathfinding" },
 
             // Group under Vehicles
             { m_Setting.GetOptionGroupLocaleID(Setting.CongestionGroup), "Congestion feedback" },
