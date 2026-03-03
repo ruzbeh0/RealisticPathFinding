@@ -37,9 +37,9 @@ using Unity.Mathematics;
 using UnityEngine;
 
 #nullable disable
-namespace RealisticPathFinding.Systems;
+namespace RealisticPathFinding.Systems
+{
 
-[CompilerGenerated]
 public partial class RPFTripNeededSystem : GameSystemBase
 {
     private const int UPDATE_INTERVAL = 16 /*0x10*/;
@@ -1994,10 +1994,8 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                                         else
                                                         {
                                                             // ISSUE: reference to a compiler-generated field
-                                                            Game.Citizens.Student student = this.m_Students[entity1] with
-                                                            {
-                                                                m_LastCommuteTime = componentData1.m_Duration
-                                                            };
+                                                            Game.Citizens.Student student = this.m_Students[entity1];
+                                                            student.m_LastCommuteTime = componentData1.m_Duration;
                                                             // ISSUE: reference to a compiler-generated field
                                                             this.m_Students[entity1] = student;
                                                         }
@@ -2583,4 +2581,5 @@ public partial class RPFTripNeededSystem : GameSystemBase
             this.__Game_Buildings_InstalledUpgrade_RO_BufferLookup = state.GetBufferLookup<InstalledUpgrade>(true);
         }
     }
+}
 }
