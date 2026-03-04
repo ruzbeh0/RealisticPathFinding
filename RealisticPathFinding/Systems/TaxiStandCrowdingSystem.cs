@@ -1,4 +1,4 @@
-﻿using Game.Common;
+using Game.Common;
 using Game.Routes;
 using Game.Simulation;
 using Game.Tools;
@@ -16,10 +16,6 @@ namespace RealisticPathFinding.Systems
         {
             public ushort BaseFee;
         }
-
-        // Tunables
-        public int Threshold = (int)Mod.m_Setting.taxi_passengers_waiting_threashold;     // “more than 7 waiting”
-        public float Increase = Mod.m_Setting.taxi_fare_increase; // +20% surcharge
 
         private EntityQuery _q;
 
@@ -44,8 +40,9 @@ namespace RealisticPathFinding.Systems
         protected override void OnUpdate()
         {
             var em = EntityManager;
-            int thr = Threshold;
-            float factor = math.max(0f, Increase);
+            var s = Mod.m_Setting;
+            int thr = (int)(s?.taxi_passengers_waiting_threashold ?? 7f);
+            float factor = math.max(0f, s?.taxi_fare_increase ?? 2f);
 
             using NativeArray<Entity> ents = _q.ToEntityArray(Allocator.Temp);
 

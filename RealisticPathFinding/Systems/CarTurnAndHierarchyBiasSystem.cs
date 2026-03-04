@@ -103,21 +103,19 @@ namespace RealisticPathFinding.Systems
             _roadDataLk.Update(this);
             _netLaneLk.Update(this);
 
-            // Build config from settings (respect your existing field names)
+            // Build config from settings every frame so changes apply immediately
             var s = Mod.m_Setting;
-            var cfg = SystemAPI.HasSingleton<CarPathBiasConfig>()
-                ? SystemAPI.GetSingleton<CarPathBiasConfig>()
-                : new CarPathBiasConfig
-                {
-                    BaseTurnPenaltySec = s?.base_turn_penalty ?? 3f,
-                    MinTurnAngleDeg = s?.min_turn_agle_deg ?? 20f,
-                    MaxTurnAngleDeg = s?.max_turn_agle_deg ?? 100f,
-                    BiasCollector = s?.collector_bias ?? 0.05f,
-                    BiasLocal = s?.local_bias ?? 0.10f,
-                    BiasVeryLocal = s?.alleyway_bias ?? 0.15f,
-                    UTurnThresholdDeg = s?.uturn_threshold_deg ?? 150f,
-                    UTurnBonusSec = s?.uturn_sec_penalty ?? 5f,
-                };
+            var cfg = new CarPathBiasConfig
+            {
+                BaseTurnPenaltySec = s?.base_turn_penalty ?? 3f,
+                MinTurnAngleDeg = s?.min_turn_agle_deg ?? 20f,
+                MaxTurnAngleDeg = s?.max_turn_agle_deg ?? 100f,
+                BiasCollector = s?.collector_bias ?? 0.05f,
+                BiasLocal = s?.local_bias ?? 0.10f,
+                BiasVeryLocal = s?.alleyway_bias ?? 0.15f,
+                UTurnThresholdDeg = s?.uturn_threshold_deg ?? 150f,
+                UTurnBonusSec = s?.uturn_sec_penalty ?? 5f,
+            };
 
             int laneN = _laneQ.CalculateEntityCount();
 
