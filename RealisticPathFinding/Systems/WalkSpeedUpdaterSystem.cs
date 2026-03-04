@@ -41,7 +41,17 @@ namespace RealisticPathFinding.Systems
             });
 
             RequireForUpdate(_q);
+            Mod.m_Setting.onSettingsApplied += OnSettingsApplied;
         }
+
+        protected override void OnDestroy()
+        {
+            if (Mod.m_Setting != null)
+                Mod.m_Setting.onSettingsApplied -= OnSettingsApplied;
+            base.OnDestroy();
+        }
+
+        private void OnSettingsApplied(Game.Settings.Setting _) => Enabled = true;
 
         protected override void OnUpdate()
         {
@@ -50,6 +60,8 @@ namespace RealisticPathFinding.Systems
             _mpsTeen = Mod.m_Setting.average_walk_speed_teen * MPH_TO_MPS;
             _mpsAdult = Mod.m_Setting.average_walk_speed_adult * MPH_TO_MPS;
             _mpsElderly = Mod.m_Setting.average_walk_speed_elderly * MPH_TO_MPS;
+
+            Mod.log.Info($"[RPF] WalkSpeedUpdaterSystem: child={_mpsChild:F3} teen={_mpsTeen:F3} adult={_mpsAdult:F3} elderly={_mpsElderly:F3} m/s");
 
             // 2) Single pass over entities: assign by age bucket
             using var entities = _q.ToEntityArray(Allocator.Temp);
@@ -62,12 +74,12 @@ namespace RealisticPathFinding.Systems
                 EntityManager.SetComponentData(e, hd);
             }
 
-            this.Enabled = false; // disable 
+            this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
         }
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // One day (or month) in-game is '262144' ticks
+            // Only used for the initial run at game load; subsequent runs are triggered by onSettingsApplied
             return 262144 / 4;
         }
 

@@ -29,6 +29,7 @@ namespace RealisticPathFinding.Systems
 
         // per-lane previous factor applied in the live graph (to apply deltas, not stack)
         private NativeParallelHashMap<Entity, float> _prevFactorByLane;
+        private float _lastLoggedFactor = float.MinValue;
 
         protected override void OnCreate()
         {
@@ -74,8 +75,10 @@ namespace RealisticPathFinding.Systems
                 return; // nothing to do (first run and factor is 1)
 
             // --- 1) Prefab side: set PathfindPedestrianData.m_WalkingCost time to original * factor
+            int prefabCount = 0;
             using (var ents = _pedPrefabQ.ToEntityArray(Allocator.Temp))
             {
+                prefabCount = ents.Length;
                 foreach (var e in ents)
                 {
                     var data = EntityManager.GetComponentData<PathfindPedestrianData>(e);
@@ -102,6 +105,7 @@ namespace RealisticPathFinding.Systems
             var pqs = World.GetOrCreateSystemManaged<PathfindQueueSystem>();
             var graph = pqs.GetDataContainer(out var dep); dep.Complete();
 
+            int laneUpdateCount = 0;
             using (var lanes = _pedLaneQ.ToEntityArray(Allocator.Temp))
             {
                 foreach (var lane in lanes)
@@ -119,7 +123,14 @@ namespace RealisticPathFinding.Systems
                     costs.m_Value.x *= ratio;
 
                     _prevFactorByLane[lane] = factor;
+                    laneUpdateCount++;
                 }
+            }
+
+            if (math.abs(factor - _lastLoggedFactor) > 1e-4f || laneUpdateCount > 0)
+            {
+                Mod.log.Info($"[RPF] PedestrianWalkCostFactorSystem: factor={factor:F3}, prefabs={prefabCount}, lanes updated={laneUpdateCount}");
+                _lastLoggedFactor = factor;
             }
 
             // Let pathfinding pick up changes
