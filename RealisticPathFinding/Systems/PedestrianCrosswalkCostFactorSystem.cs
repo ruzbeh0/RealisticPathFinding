@@ -27,24 +27,43 @@ namespace RealisticPathFinding.Systems
                 All = new[] { ComponentType.ReadWrite<PathfindPedestrianData>() }
             });
             RequireForUpdate(_pedPrefabQ);
+            Mod.m_Setting.onSettingsApplied += OnSettingsApplied;
         }
+
+        protected override void OnDestroy()
+        {
+            if (Mod.m_Setting != null)
+                Mod.m_Setting.onSettingsApplied -= OnSettingsApplied;
+            base.OnDestroy();
+        }
+
+        private void OnSettingsApplied(Game.Settings.Setting _) => Enabled = true;
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            return 262144 / 32; // similar cadence as your walk factor system
+            // Initial run only; subsequent runs triggered by onSettingsApplied
+            return 262144 / 32;
         }
 
         protected override void OnUpdate()
         {
             if (Mod.m_Setting?.disable_ped_cost == true)
+            {
+                this.Enabled = false;
                 return;
+            }
 
             float cross = math.clamp(Mod.m_Setting?.ped_crosswalk_factor ?? 1f, 0.1f, 50f);
             float unsafeCross = math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
 
             // Early out if both are 1 and this is the first run (optional)
             if (math.abs(cross - 1f) < 1e-4f && math.abs(unsafeCross - 1f) < 1e-4f)
+            {
+                this.Enabled = false;
                 return;
+            }
+
+            Mod.log.Info($"[RPF] PedestrianCrosswalkCostFactorSystem: crosswalk={cross:F3} unsafe={unsafeCross:F3}");
 
             using (var ents = _pedPrefabQ.ToEntityArray(Allocator.Temp))
             {
@@ -74,6 +93,8 @@ namespace RealisticPathFinding.Systems
                     EntityManager.SetComponentData(e, data);
                 }
             }
+
+            this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
         }
     }
 }

@@ -318,8 +318,6 @@ namespace RealisticPathFinding
             }
 
         }
-
-
     }
 
     public class LocaleEN : IDictionarySource
