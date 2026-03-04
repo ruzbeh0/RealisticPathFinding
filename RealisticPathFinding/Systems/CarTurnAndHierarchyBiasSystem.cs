@@ -34,6 +34,10 @@ namespace RealisticPathFinding.Systems
         // ----------------------- Caches ------------------------
         NativeParallelHashMap<Entity, float> _prevTurnPenaltySec;
         NativeParallelHashMap<Entity, float> _prevDensityAdd;
+        CarPathBiasConfig _lastCfg;
+        bool _cfgInitialized;
+        bool _syncingTurnAngleSettings;
+
         // ----------------------- Config ------------------------
         struct CarPathBiasConfig : IComponentData
         {
@@ -74,10 +78,63 @@ namespace RealisticPathFinding.Systems
             _prevDensityAdd = new NativeParallelHashMap<Entity, float>(256, Allocator.Persistent);
 
             RequireForUpdate(_laneQ);
+
+            Mod.m_Setting.onSettingsApplied += OnSettingsApplied;
+        }
+
+        private void OnSettingsApplied(Game.Settings.Setting _)
+        {
+            var s = Mod.m_Setting;
+            float minTurn = s?.min_turn_agle_deg ?? 20f;
+            float maxTurn = s?.max_turn_agle_deg ?? 100f;
+
+            if (minTurn > maxTurn)
+            {
+                float temp = minTurn;
+                minTurn = maxTurn;
+                maxTurn = temp;
+
+                if (s != null && !_syncingTurnAngleSettings)
+                {
+                    _syncingTurnAngleSettings = true;
+                    try
+                    {
+                        s.min_turn_agle_deg = minTurn;
+                        s.max_turn_agle_deg = maxTurn;
+                        s.ApplyAndSave();
+                    }
+                    finally
+                    {
+                        _syncingTurnAngleSettings = false;
+                    }
+
+                    Mod.log.Info($"[RPF] CarTurnAndHierarchyBiasSystem: normalized turn angle range for UI sync -> min_ang={minTurn:F1}°, max_ang={maxTurn:F1}°");
+                }
+            }
+
+            var newCfg = new CarPathBiasConfig
+            {
+                BaseTurnPenaltySec = s?.base_turn_penalty ?? 3f,
+                MinTurnAngleDeg    = minTurn,
+                MaxTurnAngleDeg    = maxTurn,
+                BiasCollector      = s?.collector_bias ?? 0.05f,
+                BiasLocal          = s?.local_bias ?? 0.10f,
+                BiasVeryLocal      = s?.alleyway_bias ?? 0.15f,
+                UTurnThresholdDeg  = s?.uturn_threshold_deg ?? 150f,
+                UTurnBonusSec      = s?.uturn_sec_penalty ?? 5f,
+            };
+
+            if (_cfgInitialized && ConfigEquals(_lastCfg, newCfg)) return;
+
+            _lastCfg = newCfg;
+            _cfgInitialized = true;
+            Enabled = true;
         }
 
         protected override void OnDestroy()
         {
+            if (Mod.m_Setting != null)
+                Mod.m_Setting.onSettingsApplied -= OnSettingsApplied;
             if (_prevTurnPenaltySec.IsCreated) _prevTurnPenaltySec.Dispose();
             if (_prevDensityAdd.IsCreated) _prevDensityAdd.Dispose();
             base.OnDestroy();
@@ -85,8 +142,8 @@ namespace RealisticPathFinding.Systems
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // Infrequent; we delta-apply so it won't stack
-            return 262144 / 32;
+            // Event-driven: run on next simulation tick after Enabled is set by onSettingsApplied
+            return 1;
         }
 
         // ----------------------- Update ------------------------
@@ -103,13 +160,22 @@ namespace RealisticPathFinding.Systems
             _roadDataLk.Update(this);
             _netLaneLk.Update(this);
 
-            // Build config from settings every frame so changes apply immediately
+            // Build config from settings on each run so changes apply as soon as the system is enabled
             var s = Mod.m_Setting;
+            float minTurn = s?.min_turn_agle_deg ?? 20f;
+            float maxTurn = s?.max_turn_agle_deg ?? 100f;
+            if (minTurn > maxTurn)
+            {
+                float temp = minTurn;
+                minTurn = maxTurn;
+                maxTurn = temp;
+            }
+
             var cfg = new CarPathBiasConfig
             {
                 BaseTurnPenaltySec = s?.base_turn_penalty ?? 3f,
-                MinTurnAngleDeg = s?.min_turn_agle_deg ?? 20f,
-                MaxTurnAngleDeg = s?.max_turn_agle_deg ?? 100f,
+                MinTurnAngleDeg = minTurn,
+                MaxTurnAngleDeg = maxTurn,
                 BiasCollector = s?.collector_bias ?? 0.05f,
                 BiasLocal = s?.local_bias ?? 0.10f,
                 BiasVeryLocal = s?.alleyway_bias ?? 0.15f,
@@ -153,10 +219,16 @@ namespace RealisticPathFinding.Systems
             var data = pqs.GetDataContainer(out var dep); dep.Complete();
 
             // A) Turn seconds (behavior-time channel)
+            int turnApplied = 0;
+            int turnEdgeMiss = 0;
             for (int i = 0; i < turnResults.Length; i++)
             {
                 var r = turnResults[i];
-                if (!TryGetEdge(data, r.Owner, out var eid)) continue;
+                if (!TryGetEdge(data, r.Owner, out var eid))
+                {
+                    turnEdgeMiss++;
+                    continue;
+                }
 
                 float prev = _prevTurnPenaltySec.TryGetValue(r.Owner, out var p) ? p : 0f;
                 float delta = r.Seconds - prev;
@@ -165,13 +237,20 @@ namespace RealisticPathFinding.Systems
                 ref var costs = ref data.SetCosts(eid);
                 costs.m_Value.y += delta; // behavior-time
                 _prevTurnPenaltySec[r.Owner] = r.Seconds;
+                turnApplied++;
             }
 
             // C) Hierarchy density adders
+            int densApplied = 0;
+            int densEdgeMiss = 0;
             for (int i = 0; i < densResults.Length; i++)
             {
                 var r = densResults[i];
-                if (!TryGetEdge(data, r.Owner, out var eid)) continue;
+                if (!TryGetEdge(data, r.Owner, out var eid))
+                {
+                    densEdgeMiss++;
+                    continue;
+                }
 
                 float prev = _prevDensityAdd.TryGetValue(r.Owner, out var p) ? p : 0f;
                 float delta = r.AddDensity - prev;
@@ -180,6 +259,16 @@ namespace RealisticPathFinding.Systems
                 ref float density = ref data.SetDensity(eid);
                 density += delta;
                 _prevDensityAdd[r.Owner] = r.AddDensity;
+                densApplied++;
+            }
+
+            if (turnApplied > 0 || densApplied > 0)
+            {
+                Mod.log.Info(
+                    $"[RPF] CarTurnAndHierarchyBiasSystem: applied → " +
+                    $"base_turn={cfg.BaseTurnPenaltySec:F2}s, min_ang={cfg.MinTurnAngleDeg:F1}°, max_ang={cfg.MaxTurnAngleDeg:F1}°, " +
+                    $"collector={cfg.BiasCollector:F3}, local={cfg.BiasLocal:F3}, verylocal={cfg.BiasVeryLocal:F3} | " +
+                    $"turns_updated={turnApplied}, density_updated={densApplied}");
             }
 
             // Let pathfinding pick up the changes
@@ -188,6 +277,8 @@ namespace RealisticPathFinding.Systems
             // Dispose temps
             turnResults.Dispose();
             densResults.Dispose();
+
+            this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
         }
 
         // ----------------------- Helpers -----------------------
@@ -197,6 +288,16 @@ namespace RealisticPathFinding.Systems
             if (d.GetSecondaryEdge(owner, out id)) return true;
             id = default; return false;
         }
+
+        static bool ConfigEquals(CarPathBiasConfig a, CarPathBiasConfig b) =>
+            math.abs(a.BaseTurnPenaltySec - b.BaseTurnPenaltySec) < 1e-4f &&
+            math.abs(a.MinTurnAngleDeg    - b.MinTurnAngleDeg)    < 1e-4f &&
+            math.abs(a.MaxTurnAngleDeg    - b.MaxTurnAngleDeg)    < 1e-4f &&
+            math.abs(a.BiasCollector      - b.BiasCollector)      < 1e-4f &&
+            math.abs(a.BiasLocal          - b.BiasLocal)          < 1e-4f &&
+            math.abs(a.BiasVeryLocal      - b.BiasVeryLocal)      < 1e-4f &&
+            math.abs(a.UTurnThresholdDeg  - b.UTurnThresholdDeg)  < 1e-4f &&
+            math.abs(a.UTurnBonusSec      - b.UTurnBonusSec)      < 1e-4f;
 
         // ----------------------- Jobs --------------------------
         [BurstCompile]

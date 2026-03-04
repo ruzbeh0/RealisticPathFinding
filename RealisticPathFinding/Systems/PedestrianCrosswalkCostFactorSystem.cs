@@ -18,6 +18,9 @@ namespace RealisticPathFinding.Systems
     public sealed partial class PedestrianCrosswalkCostFactorSystem : GameSystemBase
     {
         private EntityQuery _pedPrefabQ;
+        private float _lastCross, _lastUnsafe;
+        private bool _lastDisable;
+        private bool _crossSettingsInitialized;
 
         protected override void OnCreate()
         {
@@ -37,12 +40,28 @@ namespace RealisticPathFinding.Systems
             base.OnDestroy();
         }
 
-        private void OnSettingsApplied(Game.Settings.Setting _) => Enabled = true;
+        private void OnSettingsApplied(Game.Settings.Setting _)
+        {
+            float newCross   = math.clamp(Mod.m_Setting?.ped_crosswalk_factor        ?? 1f, 0.1f, 50f);
+            float newUnsafe  = math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
+            bool  newDisable = Mod.m_Setting?.disable_ped_cost == true;
+
+            if (_crossSettingsInitialized &&
+                math.abs(newCross  - _lastCross)  < 1e-4f &&
+                math.abs(newUnsafe - _lastUnsafe) < 1e-4f &&
+                newDisable == _lastDisable) return;
+
+            _lastCross  = newCross;
+            _lastUnsafe = newUnsafe;
+            _lastDisable = newDisable;
+            _crossSettingsInitialized = true;
+            Enabled = true;
+        }
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // Initial run only; subsequent runs triggered by onSettingsApplied
-            return 262144 / 32;
+            // Event-driven: run on next simulation tick after Enabled is set by onSettingsApplied
+            return 1;
         }
 
         protected override void OnUpdate()

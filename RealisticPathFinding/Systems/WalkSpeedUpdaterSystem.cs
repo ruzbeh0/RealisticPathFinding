@@ -26,6 +26,8 @@ namespace RealisticPathFinding.Systems
 
         // Cached per-age speeds (computed once per update from the constants above)
         private float _mpsChild, _mpsTeen, _mpsAdult, _mpsElderly;
+        private float _lastChild, _lastTeen, _lastAdult, _lastElderly;
+        private bool _walkSettingsInitialized;
 
         protected override void OnCreate()
         {
@@ -51,7 +53,27 @@ namespace RealisticPathFinding.Systems
             base.OnDestroy();
         }
 
-        private void OnSettingsApplied(Game.Settings.Setting _) => Enabled = true;
+        private void OnSettingsApplied(Game.Settings.Setting _)
+        {
+            var s = Mod.m_Setting;
+            float newChild   = s?.average_walk_speed_child   ?? 2.8f;
+            float newTeen    = s?.average_walk_speed_teen    ?? 3.3f;
+            float newAdult   = s?.average_walk_speed_adult   ?? 3.1f;
+            float newElderly = s?.average_walk_speed_elderly ?? 2.6f;
+
+            if (_walkSettingsInitialized &&
+                math.abs(newChild   - _lastChild)   < 1e-4f &&
+                math.abs(newTeen    - _lastTeen)    < 1e-4f &&
+                math.abs(newAdult   - _lastAdult)   < 1e-4f &&
+                math.abs(newElderly - _lastElderly) < 1e-4f) return;
+
+            _lastChild   = newChild;
+            _lastTeen    = newTeen;
+            _lastAdult   = newAdult;
+            _lastElderly = newElderly;
+            _walkSettingsInitialized = true;
+            Enabled = true;
+        }
 
         protected override void OnUpdate()
         {
@@ -79,8 +101,8 @@ namespace RealisticPathFinding.Systems
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // Only used for the initial run at game load; subsequent runs are triggered by onSettingsApplied
-            return 262144 / 4;
+            // Event-driven system: run on next simulation tick after it is enabled.
+            return 1;
         }
 
         private float SelectSpeedByAge(AgeMask mask)
