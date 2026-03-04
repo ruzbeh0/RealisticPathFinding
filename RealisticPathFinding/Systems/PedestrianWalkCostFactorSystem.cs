@@ -64,6 +64,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (Mod.m_Setting?.disable_ped_cost == true)
+                return;
+
             // Read your setting (fallback to 1.0 = no change)
             float factor = Mod.m_Setting?.ped_walk_time_factor ?? 1.0f;
             factor = math.clamp(factor, 0.1f, 50f);

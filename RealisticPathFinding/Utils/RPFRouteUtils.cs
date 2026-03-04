@@ -246,26 +246,21 @@ namespace RealisticPathFinding.Utils
         /// </summary>
         public static class ModeCoefficients
         {
-            // Tweak these to taste. Example defaults:
-            public static readonly Dictionary<TransportType, float> Values = new()
-        {
-            { TransportType.Bus,      Mod.m_Setting.bus_mode_weight },
-            { TransportType.Tram,     Mod.m_Setting.tram_mode_weight },
-            { TransportType.Train,    Mod.m_Setting.train_mode_weight },
-            { TransportType.Subway,   Mod.m_Setting.subway_mode_weight },
-            { TransportType.Ferry,   Mod.m_Setting.ferry_mode_weight },
-            { TransportType.Ship,     1.00f },
-            { TransportType.Airplane, 1.00f },
-            { TransportType.Helicopter, 1.00f },
-            { TransportType.Taxi,     1.00f },
-            { TransportType.None,     1.00f },
-            { TransportType.Post,     1.00f },
-            { TransportType.Rocket,   1.00f },
-            { TransportType.Work,     1.00f },
-        };
-
+            // Reads from Mod.m_Setting on every call so that runtime changes take effect immediately.
             public static float Get(TransportType t)
-                => Values.TryGetValue(t, out var k) ? k : 1.0f;
+            {
+                var s = Mod.m_Setting;
+                if (s == null) return 1.0f;
+                switch (t)
+                {
+                    case TransportType.Bus:        return s.bus_mode_weight;
+                    case TransportType.Tram:       return s.tram_mode_weight;
+                    case TransportType.Train:      return s.train_mode_weight;
+                    case TransportType.Subway:     return s.subway_mode_weight;
+                    case TransportType.Ferry:      return s.ferry_mode_weight;
+                    default:                       return 1.0f;
+                }
+            }
         }
 
         private static void OffsetPathTarget_EdgeLane(

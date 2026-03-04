@@ -36,6 +36,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (Mod.m_Setting?.disable_ped_cost == true)
+                return;
+
             float cross = math.clamp(Mod.m_Setting?.ped_crosswalk_factor ?? 1f, 0.1f, 50f);
             float unsafeCross = math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
 
