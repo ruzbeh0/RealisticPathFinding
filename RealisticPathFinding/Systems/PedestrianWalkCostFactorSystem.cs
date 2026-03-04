@@ -16,9 +16,11 @@ namespace RealisticPathFinding.Systems
     }
 
     /// <summary>
-    /// Multiplies ONLY m_WalkingCost by a user factor.
-    /// - Prefab side: PathfindPedestrianData.m_WalkingCost.x *= factor
-    /// - Live graph: multiply pedestrian edges' time-per-meter by (newFactor / prevFactor)
+    /// Scales the time channel (x) of m_WalkingCost by a user factor.
+    /// - Prefab side: m_WalkingCost.m_Value.x = orig.x * factor (from cached original)
+    /// - Live graph: multiply pedestrian edges' time-per-meter by (newFactor / prevFactor) delta ratio
+    /// Consistent with BusLanePatches / CarTurnAndHierarchyBiasSystem channel semantics:
+    ///   x = time,  y = behavior-time,  z/w = other.
     /// </summary>
     public sealed partial class PedestrianWalkCostFactorSystem : GameSystemBase
     {
@@ -85,20 +87,9 @@ namespace RealisticPathFinding.Systems
                     }
 
                     var walk = orig.Walk;
-
-                    // Multiply ONLY the TIME channel:
-                    //walk.m_Value.x = orig.Walk.m_Value.x * factor;
-
-                    // If you want to multiply ALL channels instead, replace the line above with:
-                    //walk.m_Value *= factor;
-                    if(factor > 1f)
-                    {
-                        walk.m_Value.y = factor;
-                        //walk.m_Value.x = factor;
-                    }
+                    walk.m_Value.x = orig.Walk.m_Value.x * factor;
 
                     data.m_WalkingCost = walk;
-                    //data.m_SpawnCost.m_Value.x += factor;
 
                     EntityManager.SetComponentData(e, data);
                 }
@@ -122,17 +113,7 @@ namespace RealisticPathFinding.Systems
                         continue;
 
                     ref var costs = ref graph.SetCosts(eid);
-
-                    // TIME channel (x) *= ratio:
-                    //costs.m_Value.x *= ratio;
-
-                    // For full-vector scaling instead:
-                    costs.m_Value *= ratio;
-                    if (factor > 1f)
-                    {
-                        costs.m_Value.y = factor;
-                        costs.m_Value.x = factor;
-                    }
+                    costs.m_Value.x *= ratio;
 
                     _prevFactorByLane[lane] = factor;
                 }
