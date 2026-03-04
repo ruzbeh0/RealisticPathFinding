@@ -67,11 +67,8 @@ namespace RealisticPathFinding
             //updateSystem.UpdateAfter<RealisticPathFinding.Systems.RPFResidentAISystem, Game.Simulation.ResidentAISystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.WalkSpeedUpdaterSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarTurnAndHierarchyBiasSystem>(SystemUpdatePhase.GameSimulation);
-            if(!m_Setting.disable_ped_cost)
-            {
-                updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
-                updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianCrosswalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
-            }
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianCrosswalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
             
             updateSystem.UpdateAt<RealisticPathFinding.Systems.TaxiStandCrowdingSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarCongestionEwmaSystem>(SystemUpdatePhase.GameSimulation);
