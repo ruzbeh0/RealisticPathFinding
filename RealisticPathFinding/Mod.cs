@@ -69,7 +69,7 @@ namespace RealisticPathFinding
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarTurnAndHierarchyBiasSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianCrosswalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
-            
+
             updateSystem.UpdateAt<RealisticPathFinding.Systems.TaxiStandCrowdingSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarCongestionEwmaSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.BicycleOwnerLimiterSystem>(SystemUpdatePhase.GameSimulation);

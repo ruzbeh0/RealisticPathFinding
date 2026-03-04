@@ -405,13 +405,13 @@ namespace RealisticPathFinding
             
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_factor)),
-                    "Crowding factor (max extra wait)" },
+                    "Crowding aversion factor" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_factor)),
-                    "At high crowding (configurable), increase perceived wait time. Example: 0.15 = +15%, 2.0 = +200% at/above capacity; 0 disables crowding entirely." },
+                    "Controls the extra perceived wait caused by crowded stops. Higher values increase the penalty after the crowding threshold, while the effect still saturates smoothly. 0 disables crowding aversion." },
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_stop_threashold)),
                       "Crowding threshold (load ratio)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_stop_threashold)),
-                     "Applies crowding penalty when the number of people at a stop reaches or exceeds this fraction of vehicle capacity (0–1). Example: 0.5 means crowding begins when the stop is half a vehicle’s capacity." },
+                     "Crowding aversion starts when the number of people at a stop reaches this fraction of vehicle capacity (0–1). Example: 0.5 means crowding discomfort begins when the stop is half a vehicle’s capacity. Separate extra wait can still appear once the queue exceeds one full vehicle load." },
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)), "Non-bus on bus-only lane penalty (s)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)),  "Extra time penalty per bus-only segment for non-bus vehicles. 0 = off." },
 
