@@ -75,7 +75,7 @@ namespace RealisticPathFinding
             walk_long_comfort_m = 600f;
             walk_long_ramp_m = 700f;
             walk_long_min_mult = 0.3f;
-            ped_walk_time_factor = 1.0f;
+            ped_walk_time_factor = 1.6f;
             cong_min_sample_sec = 0.2f;
             cong_alpha = 0.15f;
             cong_min_push_sec = 0.5f;
@@ -85,8 +85,8 @@ namespace RealisticPathFinding
             disable_ped_cost = false;
             taxi_passengers_waiting_threashold = 7f;
             taxi_fare_increase = 2f;
-            ped_crosswalk_factor = 0.7f;
-            ped_unsafe_crosswalk_factor = 1f;
+            ped_crosswalk_factor = 1f;
+            ped_unsafe_crosswalk_factor = 2f;
             ferry_mode_weight = 1f;
             nonbus_buslane_penalty_sec = 30f;
             choice_tau_sec = 4f;
@@ -318,8 +318,6 @@ namespace RealisticPathFinding
             }
 
         }
-
-
     }
 
     public class LocaleEN : IDictionarySource

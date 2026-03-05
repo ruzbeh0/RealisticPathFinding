@@ -1,4 +1,4 @@
-﻿using Game;
+using Game;
 using Game.Net;
 using Game.Pathfind;
 using Game.Prefabs;
@@ -16,9 +16,11 @@ namespace RealisticPathFinding.Systems
     }
 
     /// <summary>
-    /// Multiplies ONLY m_WalkingCost by a user factor.
-    /// - Prefab side: PathfindPedestrianData.m_WalkingCost.x *= factor
-    /// - Live graph: multiply pedestrian edges' time-per-meter by (newFactor / prevFactor)
+    /// Scales the time channel (x) of m_WalkingCost by a user factor.
+    /// - Prefab side: m_WalkingCost.m_Value.x = orig.x * factor (from cached original)
+    /// - Live graph: multiply pedestrian edges' time-per-meter by (newFactor / prevFactor) delta ratio
+    /// Consistent with BusLanePatches / CarTurnAndHierarchyBiasSystem channel semantics:
+    ///   x = time,  y = behavior-time,  z/w = other.
     /// </summary>
     public sealed partial class PedestrianWalkCostFactorSystem : GameSystemBase
     {
@@ -27,6 +29,10 @@ namespace RealisticPathFinding.Systems
 
         // per-lane previous factor applied in the live graph (to apply deltas, not stack)
         private NativeParallelHashMap<Entity, float> _prevFactorByLane;
+        private float _lastLoggedFactor = float.MinValue;
+        private float _lastKnownFactor;
+        private bool _lastKnownDisable;
+        private bool _pedSettingsInitialized;
 
         protected override void OnCreate()
         {
@@ -46,22 +52,44 @@ namespace RealisticPathFinding.Systems
 
             RequireForUpdate(_pedPrefabQ);
             RequireForUpdate(_pedLaneQ);
+
+            Mod.m_Setting.onSettingsApplied += OnSettingsApplied;
+        }
+
+        private void OnSettingsApplied(Game.Settings.Setting _)
+        {
+            float newFactor = math.clamp(Mod.m_Setting?.ped_walk_time_factor ?? 1.0f, 0.1f, 50f);
+            bool newDisable = Mod.m_Setting?.disable_ped_cost == true;
+
+            if (_pedSettingsInitialized &&
+                math.abs(newFactor - _lastKnownFactor) < 1e-4f &&
+                newDisable == _lastKnownDisable) return;
+
+            _lastKnownFactor = newFactor;
+            _lastKnownDisable = newDisable;
+            _pedSettingsInitialized = true;
+            Enabled = true;
         }
 
         protected override void OnDestroy()
         {
+            if (Mod.m_Setting != null)
+                Mod.m_Setting.onSettingsApplied -= OnSettingsApplied;
             if (_prevFactorByLane.IsCreated) _prevFactorByLane.Dispose();
             base.OnDestroy();
         }
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // Doesn’t need to run often; adjust if you want instant reaction to slider changes
-            return 262144/32; // ~once per in-game day
+            // Event-driven: run on next simulation tick after Enabled is set by onSettingsApplied
+            return 1;
         }
 
         protected override void OnUpdate()
         {
+            if (Mod.m_Setting?.disable_ped_cost == true)
+                return;
+
             // Read your setting (fallback to 1.0 = no change)
             float factor = Mod.m_Setting?.ped_walk_time_factor ?? 1.0f;
             factor = math.clamp(factor, 0.1f, 50f);
@@ -69,8 +97,10 @@ namespace RealisticPathFinding.Systems
                 return; // nothing to do (first run and factor is 1)
 
             // --- 1) Prefab side: set PathfindPedestrianData.m_WalkingCost time to original * factor
+            int prefabCount = 0;
             using (var ents = _pedPrefabQ.ToEntityArray(Allocator.Temp))
             {
+                prefabCount = ents.Length;
                 foreach (var e in ents)
                 {
                     var data = EntityManager.GetComponentData<PathfindPedestrianData>(e);
@@ -85,20 +115,9 @@ namespace RealisticPathFinding.Systems
                     }
 
                     var walk = orig.Walk;
-
-                    // Multiply ONLY the TIME channel:
-                    //walk.m_Value.x = orig.Walk.m_Value.x * factor;
-
-                    // If you want to multiply ALL channels instead, replace the line above with:
-                    //walk.m_Value *= factor;
-                    if(factor > 1f)
-                    {
-                        walk.m_Value.y = factor;
-                        //walk.m_Value.x = factor;
-                    }
+                    walk.m_Value.x = orig.Walk.m_Value.x * factor;
 
                     data.m_WalkingCost = walk;
-                    //data.m_SpawnCost.m_Value.x += factor;
 
                     EntityManager.SetComponentData(e, data);
                 }
@@ -108,6 +127,7 @@ namespace RealisticPathFinding.Systems
             var pqs = World.GetOrCreateSystemManaged<PathfindQueueSystem>();
             var graph = pqs.GetDataContainer(out var dep); dep.Complete();
 
+            int laneUpdateCount = 0;
             using (var lanes = _pedLaneQ.ToEntityArray(Allocator.Temp))
             {
                 foreach (var lane in lanes)
@@ -122,24 +142,23 @@ namespace RealisticPathFinding.Systems
                         continue;
 
                     ref var costs = ref graph.SetCosts(eid);
-
-                    // TIME channel (x) *= ratio:
-                    //costs.m_Value.x *= ratio;
-
-                    // For full-vector scaling instead:
-                    costs.m_Value *= ratio;
-                    if (factor > 1f)
-                    {
-                        costs.m_Value.y = factor;
-                        costs.m_Value.x = factor;
-                    }
+                    costs.m_Value.x *= ratio;
 
                     _prevFactorByLane[lane] = factor;
+                    laneUpdateCount++;
                 }
+            }
+
+            if (math.abs(factor - _lastLoggedFactor) > 1e-4f || laneUpdateCount > 0)
+            {
+                Mod.log.Info($"[RPF] PedestrianWalkCostFactorSystem: factor={factor:F3}, prefabs={prefabCount}, lanes updated={laneUpdateCount}");
+                _lastLoggedFactor = factor;
             }
 
             // Let pathfinding pick up changes
             pqs.AddDataReader(default);
+
+            this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
         }
 
         private static bool TryGetEdge(NativePathfindData data, Entity owner, out EdgeID id)

@@ -202,7 +202,7 @@ namespace RealisticPathFinding.Systems
                 float alphaUp = cfg.Alpha;       
                 float alphaDown = cfg.Alpha * 0.7f; // slower recovery
                 float alpha = (sampleAvg > old) ? alphaUp : alphaDown;
-                float ewma = alpha * sampleAvg + (1f - cfg.Alpha) * old;
+                float ewma = alpha * sampleAvg + (1f - alpha) * old;
 
                 if (math.abs(ewma - old) < cfg.UpdateThresholdSec)
                 {

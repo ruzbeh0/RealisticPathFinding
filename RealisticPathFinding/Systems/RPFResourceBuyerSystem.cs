@@ -32,9 +32,9 @@ using UnityEngine;
 using Game;
 
 #nullable disable
-namespace RealisticPathFinding.Systems;
+namespace RealisticPathFinding.Systems
+{
 
-[CompilerGenerated]
 public partial class RPFResourceBuyerSystem : GameSystemBase
 {
     private const int UPDATE_INTERVAL = 16 /*0x10*/;
@@ -635,10 +635,8 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
                                 // ISSUE: reference to a compiler-generated field
                                 // ISSUE: reference to a compiler-generated field
                                 // ISSUE: reference to a compiler-generated field
-                                BuyingCompany buyingCompany = this.m_BuyingCompanies[salesEvent.m_Buyer] with
-                                {
-                                    m_LastTradePartner = salesEvent.m_Seller
-                                };
+                                BuyingCompany buyingCompany = this.m_BuyingCompanies[salesEvent.m_Buyer];
+                                buyingCompany.m_LastTradePartner = salesEvent.m_Seller;
                                 // ISSUE: reference to a compiler-generated field
                                 // ISSUE: reference to a compiler-generated field
                                 this.m_BuyingCompanies[salesEvent.m_Buyer] = buyingCompany;
@@ -1556,4 +1554,5 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
             this.__Game_City_Population_RO_ComponentLookup = state.GetComponentLookup<Population>(true);
         }
     }
+}
 }
