@@ -66,24 +66,13 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
-            if (Mod.m_Setting?.disable_ped_cost == true)
-            {
-                this.Enabled = false;
-                return;
-            }
+            bool disable = Mod.m_Setting?.disable_ped_cost == true;
+            float cross = disable ? 1f : math.clamp(Mod.m_Setting?.ped_crosswalk_factor ?? 1f, 0.1f, 50f);
+            float unsafeCross = disable ? 1f : math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
+            bool baseline = math.abs(cross - 1f) < 1e-4f && math.abs(unsafeCross - 1f) < 1e-4f;
 
-            float cross = math.clamp(Mod.m_Setting?.ped_crosswalk_factor ?? 1f, 0.1f, 50f);
-            float unsafeCross = math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
-
-            // Early out if both are 1 and this is the first run (optional)
-            if (math.abs(cross - 1f) < 1e-4f && math.abs(unsafeCross - 1f) < 1e-4f)
-            {
-                this.Enabled = false;
-                return;
-            }
-
-            Mod.log.Info($"[RPF] PedestrianCrosswalkCostFactorSystem: crosswalk={cross:F3} unsafe={unsafeCross:F3}");
-
+            int prefabUpdates = 0;
+            bool sawCachedOrig = false;
             using (var ents = _pedPrefabQ.ToEntityArray(Allocator.Temp))
             {
                 foreach (var e in ents)
@@ -92,9 +81,15 @@ namespace RealisticPathFinding.Systems
 
                     PedCrosswalkCostOrig orig;
                     if (EntityManager.HasComponent<PedCrosswalkCostOrig>(e))
+                    {
                         orig = EntityManager.GetComponentData<PedCrosswalkCostOrig>(e);
+                        sawCachedOrig = true;
+                    }
                     else
                     {
+                        if (baseline)
+                            continue;
+
                         orig = new PedCrosswalkCostOrig
                         {
                             UnsafeCrosswalk = data.m_UnsafeCrosswalkCost,
@@ -106,14 +101,34 @@ namespace RealisticPathFinding.Systems
                     var unsafeCw = orig.UnsafeCrosswalk; unsafeCw.m_Value *= unsafeCross;
                     var cw = orig.Crosswalk; cw.m_Value *= cross;
 
+                    if (CostAlmostEqual(data.m_UnsafeCrosswalkCost, unsafeCw) &&
+                        CostAlmostEqual(data.m_CrosswalkCost, cw))
+                        continue;
+
                     data.m_UnsafeCrosswalkCost = unsafeCw;
                     data.m_CrosswalkCost = cw;
 
                     EntityManager.SetComponentData(e, data);
+                    prefabUpdates++;
                 }
             }
 
+            if (prefabUpdates > 0)
+                Mod.log.Info($"[RPF] PedestrianCrosswalkCostFactorSystem: crosswalk={cross:F3}, unsafe={unsafeCross:F3}, prefab_updates={prefabUpdates}");
+
+            if (baseline && !sawCachedOrig)
+            {
+                this.Enabled = false;
+                return;
+            }
+
             this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
+        }
+
+        private static bool CostAlmostEqual(PathfindCosts a, PathfindCosts b)
+        {
+            float4 d = math.abs(a.m_Value - b.m_Value);
+            return d.x < 1e-4f && d.y < 1e-4f && d.z < 1e-4f && d.w < 1e-4f;
         }
     }
 }

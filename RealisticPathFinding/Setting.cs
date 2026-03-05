@@ -231,10 +231,12 @@ namespace RealisticPathFinding
 
         [SettingsUISlider(min = 0.1f, max = 5f, step = 0.05f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(disable_ped_cost))]
         public float ped_crosswalk_factor { get; set; }
 
         [SettingsUISlider(min = 0.1f, max = 10f, step = 0.05f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(disable_ped_cost))]
         public float ped_unsafe_crosswalk_factor { get; set; }
 
 
@@ -539,8 +541,8 @@ namespace RealisticPathFinding
             "Walking cost multiplier" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.ped_walk_time_factor)),
             "Multiplies the pedestrian walking cost. 1.0 = no change; higher values make walking less attractive overall." },
-            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.disable_ped_cost)), "Disable walking cost multiplier" },
-                { m_Setting.GetOptionDescLocaleID(nameof(Setting.disable_ped_cost)), $"Disable walking cost multiplier. This will make this mod more compatible with other mods that affect pedestrian pathfinding" },
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.disable_ped_cost)), "Disable pedestrian cost adjustments" },
+                { m_Setting.GetOptionDescLocaleID(nameof(Setting.disable_ped_cost)), "Disables all pedestrian cost adjustments from this mod (walking multiplier and crosswalk factors) and restores baseline pedestrian costs for better mod compatibility." },
 
             // Group under Vehicles
             { m_Setting.GetOptionGroupLocaleID(Setting.CongestionGroup), "Congestion feedback" },

@@ -29,7 +29,6 @@ namespace RealisticPathFinding.Systems
 
         // per-lane previous factor applied in the live graph (to apply deltas, not stack)
         private NativeParallelHashMap<Entity, float> _prevFactorByLane;
-        private float _lastLoggedFactor = float.MinValue;
         private float _lastKnownFactor;
         private bool _lastKnownDisable;
         private bool _pedSettingsInitialized;
@@ -87,17 +86,16 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
-            if (Mod.m_Setting?.disable_ped_cost == true)
-                return;
-
-            // Read your setting (fallback to 1.0 = no change)
-            float factor = Mod.m_Setting?.ped_walk_time_factor ?? 1.0f;
-            factor = math.clamp(factor, 0.1f, 50f);
-            if (math.abs(factor - 1f) < 1e-4f && _prevFactorByLane.IsCreated && _prevFactorByLane.Count() == 0)
-                return; // nothing to do (first run and factor is 1)
+            bool disable = Mod.m_Setting?.disable_ped_cost == true;
+            float factor = disable
+                ? 1f
+                : math.clamp(Mod.m_Setting?.ped_walk_time_factor ?? 1.0f, 0.1f, 50f);
+            bool baselineFactor = math.abs(factor - 1f) < 1e-4f;
 
             // --- 1) Prefab side: set PathfindPedestrianData.m_WalkingCost time to original * factor
             int prefabCount = 0;
+            int prefabUpdateCount = 0;
+            bool sawCachedOrig = false;
             using (var ents = _pedPrefabQ.ToEntityArray(Allocator.Temp))
             {
                 prefabCount = ents.Length;
@@ -105,9 +103,16 @@ namespace RealisticPathFinding.Systems
                 {
                     var data = EntityManager.GetComponentData<PathfindPedestrianData>(e);
 
-                    PedWalkCostOrig orig;
                     bool hasOrig = EntityManager.HasComponent<PedWalkCostOrig>(e);
-                    if (hasOrig) orig = EntityManager.GetComponentData<PedWalkCostOrig>(e);
+                    if (!hasOrig && baselineFactor)
+                        continue;
+
+                    PedWalkCostOrig orig;
+                    if (hasOrig)
+                    {
+                        sawCachedOrig = true;
+                        orig = EntityManager.GetComponentData<PedWalkCostOrig>(e);
+                    }
                     else
                     {
                         orig = new PedWalkCostOrig { Walk = data.m_WalkingCost };
@@ -117,46 +122,68 @@ namespace RealisticPathFinding.Systems
                     var walk = orig.Walk;
                     walk.m_Value.x = orig.Walk.m_Value.x * factor;
 
-                    data.m_WalkingCost = walk;
+                    if (CostAlmostEqual(data.m_WalkingCost, walk))
+                        continue;
 
+                    data.m_WalkingCost = walk;
                     EntityManager.SetComponentData(e, data);
+                    prefabUpdateCount++;
                 }
+            }
+
+            bool hadLaneOverrides = _prevFactorByLane.IsCreated && _prevFactorByLane.Count() > 0;
+            if (baselineFactor && !sawCachedOrig && !hadLaneOverrides)
+            {
+                this.Enabled = false;
+                return;
             }
 
             // --- 2) Live graph: multiply existing pedestrian edges’ time-per-meter by ratio
-            var pqs = World.GetOrCreateSystemManaged<PathfindQueueSystem>();
-            var graph = pqs.GetDataContainer(out var dep); dep.Complete();
-
             int laneUpdateCount = 0;
-            using (var lanes = _pedLaneQ.ToEntityArray(Allocator.Temp))
+            bool touchedGraph = false;
+            if (!baselineFactor || hadLaneOverrides)
             {
-                foreach (var lane in lanes)
+                int laneCount = _pedLaneQ.CalculateEntityCount();
+                if (_prevFactorByLane.Capacity < laneCount)
+                    _prevFactorByLane.Capacity = laneCount;
+
+                var pqs = World.GetOrCreateSystemManaged<PathfindQueueSystem>();
+                var graph = pqs.GetDataContainer(out var dep); dep.Complete();
+
+                using (var lanes = _pedLaneQ.ToEntityArray(Allocator.Temp))
                 {
-                    if (!TryGetEdge(graph, lane, out var eid))
-                        continue;
+                    foreach (var lane in lanes)
+                    {
+                        if (!TryGetEdge(graph, lane, out var eid))
+                            continue;
 
-                    float prev = _prevFactorByLane.TryGetValue(lane, out var p) ? p : 1f;
-                    float ratio = (prev > 0f) ? factor / prev : factor;
+                        float prev = _prevFactorByLane.TryGetValue(lane, out var p) ? p : 1f;
+                        float ratio = (prev > 0f) ? factor / prev : factor;
 
-                    if (math.abs(ratio - 1f) < 1e-4f)
-                        continue;
+                        if (math.abs(ratio - 1f) < 1e-4f)
+                            continue;
 
-                    ref var costs = ref graph.SetCosts(eid);
-                    costs.m_Value.x *= ratio;
-
-                    _prevFactorByLane[lane] = factor;
-                    laneUpdateCount++;
+                        ref var costs = ref graph.SetCosts(eid);
+                        costs.m_Value.x *= ratio;
+                        _prevFactorByLane[lane] = factor;
+                        laneUpdateCount++;
+                        touchedGraph = true;
+                    }
                 }
+
+                if (touchedGraph)
+                    pqs.AddDataReader(default);
             }
 
-            if (math.abs(factor - _lastLoggedFactor) > 1e-4f || laneUpdateCount > 0)
+            if (baselineFactor)
             {
-                Mod.log.Info($"[RPF] PedestrianWalkCostFactorSystem: factor={factor:F3}, prefabs={prefabCount}, lanes updated={laneUpdateCount}");
-                _lastLoggedFactor = factor;
+                _prevFactorByLane.Clear();
             }
 
-            // Let pathfinding pick up changes
-            pqs.AddDataReader(default);
+            if (prefabUpdateCount > 0 || laneUpdateCount > 0)
+            {
+                Mod.log.Info($"[RPF] PedestrianWalkCostFactorSystem: factor={factor:F3}, prefabs={prefabCount}, prefab_updates={prefabUpdateCount}, lanes_updated={laneUpdateCount}");
+            }
 
             this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
         }
@@ -166,6 +193,12 @@ namespace RealisticPathFinding.Systems
             if (data.GetEdge(owner, out id)) return true;
             if (data.GetSecondaryEdge(owner, out id)) return true;
             id = default; return false;
+        }
+
+        private static bool CostAlmostEqual(PathfindCosts a, PathfindCosts b)
+        {
+            float4 d = math.abs(a.m_Value - b.m_Value);
+            return d.x < 1e-4f && d.y < 1e-4f && d.z < 1e-4f && d.w < 1e-4f;
         }
     }
 }
