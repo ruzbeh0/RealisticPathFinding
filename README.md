@@ -9,7 +9,7 @@ A Cities: Skylines II mod that replaces the vanilla pathfinding cost model with 
 ### 🚗 Vehicles
 
 | Feature | Description |
-|---|---|
+| --- | --- |
 | **Turn penalties** | Adds a time cost for sharp turns, scaled by angle. U-turns carry an extra fixed penalty. |
 | **Road hierarchy bias** | Adds a density cost to collector, local, and alleyway roads, pushing traffic toward higher-class roads. |
 | **Congestion feedback (EWMA)** | Monitors real in-game travel times per lane and feeds live congestion back into routing costs via exponential smoothing. |
@@ -19,7 +19,7 @@ A Cities: Skylines II mod that replaces the vanilla pathfinding cost model with 
 ### 🚌 Transit
 
 | Feature | Description |
-|---|---|
+| --- | --- |
 | **Waiting time weight** | Multiplies the perceived first-stop wait, making it more or less painful than in-vehicle time. |
 | **Transfer penalty** | Applies an extra multiplier to wait time at each transfer. |
 | **Feeder→trunk transfer penalty** | Separate multiplier for transferring from a bus/tram to metro/train/ship. |
@@ -31,7 +31,7 @@ A Cities: Skylines II mod that replaces the vanilla pathfinding cost model with 
 ### 🚶 Pedestrians
 
 | Feature | Description |
-|---|---|
+| --- | --- |
 | **Age-specific walk speeds** | Sets separate walking speeds for children, teens, adults, and the elderly. |
 | **Walking cost multiplier** | Globally scales pedestrian path cost to control how attractive walking is. |
 | **Long-distance penalty** | Ramps down perceived walk speed beyond a comfort distance, discouraging very long walks. |
@@ -40,7 +40,7 @@ A Cities: Skylines II mod that replaces the vanilla pathfinding cost model with 
 ### 🚲 Bicycles
 
 | Feature | Description |
-|---|---|
+| --- | --- |
 | **Ownership by age** | Sets the share of teens, adults, and seniors allowed to use bicycles. |
 | **Short-trip penalty** | Penalises very short bike trips, keeping walking competitive for nearby destinations. |
 | **Long-trip penalty** | Gradually discourages cycling beyond a comfort distance, favouring transit or cars. |
@@ -48,7 +48,7 @@ A Cities: Skylines II mod that replaces the vanilla pathfinding cost model with 
 ### 🚕 Taxi
 
 | Feature | Description |
-|---|---|
+| --- | --- |
 | **Crowding fare increase** | Raises perceived taxi cost when the waiting queue at a stand exceeds a threshold. |
 
 ## Configuration
@@ -58,7 +58,7 @@ All settings are available in **Options → Realistic Path Finding**.
 ### Notable defaults
 
 | Setting | Default | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Car mode weight | 0.90 | Slightly favours car over transit |
 | Base turn penalty | 2 s | Per sharp turn |
 | Collector bias | 0.05 | Mild highway preference |
@@ -75,7 +75,7 @@ All settings are available in **Options → Realistic Path Finding**.
 ## Compatibility
 
 | Mod | Status |
-|---|---|
+| --- | --- |
 | **Realistic Trips(Time2Work)** | ✅ Detected automatically — trip timing is adjusted accordingly |
 | Other pathfinding mods | ⚠️ May conflict — use **Disable walking cost multiplier** if pedestrian issues arise |
 
