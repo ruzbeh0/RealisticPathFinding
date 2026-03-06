@@ -1,4 +1,4 @@
-﻿// RealisticPathFinding.Systems/PedestrianCrosswalkCostFactorSystem.cs
+// RealisticPathFinding.Systems/PedestrianCrosswalkCostFactorSystem.cs
 using Game;
 using Game.Pathfind;
 using Game.Prefabs;
@@ -8,16 +8,25 @@ using Unity.Mathematics;
 
 namespace RealisticPathFinding.Systems
 {
-    // Cache originals so repeated updates don’t stack
+    // Stores the prefab baseline captured before any safe/unsafe crosswalk multiplier is applied.
+    // Re-runs always derive from this snapshot so setting changes do not stack.
     public struct PedCrosswalkCostOrig : IComponentData
     {
         public PathfindCosts UnsafeCrosswalk;
         public PathfindCosts Crosswalk;
     }
 
+    /// <summary>
+    /// Applies configurable safe and unsafe crosswalk cost multipliers to pedestrian prefabs.
+    ///
+    /// The system is event-driven: OnSettingsApplied decides whether another pass is needed and
+    /// Enabled only schedules that pass. Disabling pedestrian-cost adjustments still runs one
+    /// restoration pass so cached crosswalk overrides return to the 1x baseline.
+    /// </summary>
     public sealed partial class PedestrianCrosswalkCostFactorSystem : GameSystemBase
     {
         private EntityQuery _pedPrefabQ;
+        // These fields are used only to decide whether an Apply action needs another run.
         private float _lastCross, _lastUnsafe;
         private bool _lastDisable;
         private bool _crossSettingsInitialized;
@@ -42,16 +51,18 @@ namespace RealisticPathFinding.Systems
 
         private void OnSettingsApplied(Game.Settings.Setting _)
         {
-            float newCross   = math.clamp(Mod.m_Setting?.ped_crosswalk_factor        ?? 1f, 0.1f, 50f);
-            float newUnsafe  = math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
-            bool  newDisable = Mod.m_Setting?.disable_ped_cost == true;
+            float newCross = math.clamp(Mod.m_Setting?.ped_crosswalk_factor ?? 1f, 0.1f, 50f);
+            float newUnsafe = math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
+            bool newDisable = Mod.m_Setting?.disable_ped_cost == true;
 
+            // Enabled is only the scheduling flag for the next simulation tick. Skip the rerun when
+            // the effective crosswalk settings are unchanged since the last apply event.
             if (_crossSettingsInitialized &&
-                math.abs(newCross  - _lastCross)  < 1e-4f &&
+                math.abs(newCross - _lastCross) < 1e-4f &&
                 math.abs(newUnsafe - _lastUnsafe) < 1e-4f &&
                 newDisable == _lastDisable) return;
 
-            _lastCross  = newCross;
+            _lastCross = newCross;
             _lastUnsafe = newUnsafe;
             _lastDisable = newDisable;
             _crossSettingsInitialized = true;
@@ -60,18 +71,21 @@ namespace RealisticPathFinding.Systems
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // Event-driven: run on next simulation tick after Enabled is set by onSettingsApplied
+            // Event-driven: run on next simulation tick after Enabled is set by OnSettingsApplied.
             return 1;
         }
 
         protected override void OnUpdate()
         {
+            // Re-read settings when the pass executes. "Disable" means restore baseline 1x costs
+            // from cached originals; it is not interchangeable with the system's Enabled flag.
             bool disable = Mod.m_Setting?.disable_ped_cost == true;
             float cross = disable ? 1f : math.clamp(Mod.m_Setting?.ped_crosswalk_factor ?? 1f, 0.1f, 50f);
             float unsafeCross = disable ? 1f : math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
             bool baseline = math.abs(cross - 1f) < 1e-4f && math.abs(unsafeCross - 1f) < 1e-4f;
 
             int prefabUpdates = 0;
+            // True once we have found at least one cached original that could need restoration.
             bool sawCachedOrig = false;
             using (var ents = _pedPrefabQ.ToEntityArray(Allocator.Temp))
             {
@@ -87,6 +101,8 @@ namespace RealisticPathFinding.Systems
                     }
                     else
                     {
+                        // Do not capture a baseline during a no-op 1x pass. Prefabs only gain an
+                        // origin component once this system actually needs to own a crosswalk change.
                         if (baseline)
                             continue;
 
@@ -101,6 +117,7 @@ namespace RealisticPathFinding.Systems
                     var unsafeCw = orig.UnsafeCrosswalk; unsafeCw.m_Value *= unsafeCross;
                     var cw = orig.Crosswalk; cw.m_Value *= cross;
 
+                    // Avoid redundant writes and log noise when both effective crosswalk costs match.
                     if (CostAlmostEqual(data.m_UnsafeCrosswalkCost, unsafeCw) &&
                         CostAlmostEqual(data.m_CrosswalkCost, cw))
                         continue;
@@ -116,13 +133,15 @@ namespace RealisticPathFinding.Systems
             if (prefabUpdates > 0)
                 Mod.log.Info($"[RPF] PedestrianCrosswalkCostFactorSystem: crosswalk={cross:F3}, unsafe={unsafeCross:F3}, prefab_updates={prefabUpdates}");
 
+            // Baseline is not the same thing as "no work": if cached originals exist, this pass may
+            // still need to restore them. Only exit early when nothing was ever cached.
             if (baseline && !sawCachedOrig)
             {
                 this.Enabled = false;
                 return;
             }
 
-            this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
+            this.Enabled = false; // Run once; re-enabled by OnSettingsApplied when settings change.
         }
 
         private static bool CostAlmostEqual(PathfindCosts a, PathfindCosts b)

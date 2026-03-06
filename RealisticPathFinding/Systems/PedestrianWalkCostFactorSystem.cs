@@ -9,26 +9,33 @@ using PedestrianLane = Game.Net.PedestrianLane;
 
 namespace RealisticPathFinding.Systems
 {
-    // Caches original prefab costs so repeated updates don’t stack
+    // Stores the prefab baseline captured before any RPF multiplier is applied.
+    // Re-runs always derive from this snapshot so setting changes do not stack.
     public struct PedWalkCostOrig : IComponentData
     {
         public PathfindCosts Walk;
     }
 
     /// <summary>
-    /// Scales the time channel (x) of m_WalkingCost by a user factor.
-    /// - Prefab side: m_WalkingCost.m_Value.x = orig.x * factor (from cached original)
-    /// - Live graph: multiply pedestrian edges' time-per-meter by (newFactor / prevFactor) delta ratio
-    /// Consistent with BusLanePatches / CarTurnAndHierarchyBiasSystem channel semantics:
-    ///   x = time,  y = behavior-time,  z/w = other.
+    /// Applies the pedestrian walking-cost multiplier in two places:
+    /// - Prefab side: derive PathfindPedestrianData.m_WalkingCost from the cached original value.
+    /// - Live graph side: apply only the delta ratio (new factor / previous factor) to pedestrian edges.
+    ///
+    /// The system is event-driven: OnSettingsApplied decides whether another pass is needed and
+    /// Enabled only schedules that pass. Disabling pedestrian-cost adjustments still runs one
+    /// restoration pass so old overrides return to the 1x baseline instead of being left behind.
+    ///
+    /// x = time, y = behavior-time, z/w = other cost channels.
     /// </summary>
     public sealed partial class PedestrianWalkCostFactorSystem : GameSystemBase
     {
         private EntityQuery _pedPrefabQ;  // PathfindPedestrianData
         private EntityQuery _pedLaneQ;    // PedestrianLane owners
 
-        // per-lane previous factor applied in the live graph (to apply deltas, not stack)
+        // Live graph edges do not keep their own original walking factor, so track the factor that
+        // RPF last applied per lane and write only the delta on the next settings pass.
         private NativeParallelHashMap<Entity, float> _prevFactorByLane;
+        // These fields are used only to decide whether an Apply action needs another run.
         private float _lastKnownFactor;
         private bool _lastKnownDisable;
         private bool _pedSettingsInitialized;
@@ -60,6 +67,8 @@ namespace RealisticPathFinding.Systems
             float newFactor = math.clamp(Mod.m_Setting?.ped_walk_time_factor ?? 1.0f, 0.1f, 50f);
             bool newDisable = Mod.m_Setting?.disable_ped_cost == true;
 
+            // Enabled is just the scheduling flag for the next simulation tick. If the effective
+            // pedestrian settings did not change, skip the rerun entirely.
             if (_pedSettingsInitialized &&
                 math.abs(newFactor - _lastKnownFactor) < 1e-4f &&
                 newDisable == _lastKnownDisable) return;
@@ -80,21 +89,24 @@ namespace RealisticPathFinding.Systems
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            // Event-driven: run on next simulation tick after Enabled is set by onSettingsApplied
+            // Event-driven: run on next simulation tick after Enabled is set by OnSettingsApplied.
             return 1;
         }
 
         protected override void OnUpdate()
         {
+            // Re-read settings when the pass executes. "Disable" means restore baseline walking costs
+            // from cached originals; it is not the same thing as disabling the system scheduler.
             bool disable = Mod.m_Setting?.disable_ped_cost == true;
             float factor = disable
                 ? 1f
                 : math.clamp(Mod.m_Setting?.ped_walk_time_factor ?? 1.0f, 0.1f, 50f);
             bool baselineFactor = math.abs(factor - 1f) < 1e-4f;
 
-            // --- 1) Prefab side: set PathfindPedestrianData.m_WalkingCost time to original * factor
+            // 1) Prefab side: derive the current walking cost from the cached original value.
             int prefabCount = 0;
             int prefabUpdateCount = 0;
+            // True once we have found at least one cached original that could need restoration.
             bool sawCachedOrig = false;
             using (var ents = _pedPrefabQ.ToEntityArray(Allocator.Temp))
             {
@@ -104,6 +116,7 @@ namespace RealisticPathFinding.Systems
                     var data = EntityManager.GetComponentData<PathfindPedestrianData>(e);
 
                     bool hasOrig = EntityManager.HasComponent<PedWalkCostOrig>(e);
+                    // A baseline pass should stay a no-op for prefabs this system never modified.
                     if (!hasOrig && baselineFactor)
                         continue;
 
@@ -122,6 +135,7 @@ namespace RealisticPathFinding.Systems
                     var walk = orig.Walk;
                     walk.m_Value.x = orig.Walk.m_Value.x * factor;
 
+                    // Avoid redundant writes and log noise when the effective walking cost is unchanged.
                     if (CostAlmostEqual(data.m_WalkingCost, walk))
                         continue;
 
@@ -131,6 +145,8 @@ namespace RealisticPathFinding.Systems
                 }
             }
 
+            // If the graph does not remember any previous per-lane override, factor 1x means there is
+            // nothing left to restore outside prefabs and the pass can exit quietly.
             bool hadLaneOverrides = _prevFactorByLane.IsCreated && _prevFactorByLane.Count() > 0;
             if (baselineFactor && !sawCachedOrig && !hadLaneOverrides)
             {
@@ -138,7 +154,10 @@ namespace RealisticPathFinding.Systems
                 return;
             }
 
-            // --- 2) Live graph: multiply existing pedestrian edges’ time-per-meter by ratio
+            // 2) Live graph: apply only the ratio between the new factor and the factor previously
+            // applied to each lane. This keeps repeated runs non-stacking without taking a full graph
+            // snapshot. Known limitation: another mod changing the same edge after capture can still be
+            // overwritten on a later RPF reapply because this map only tracks RPF's own history.
             int laneUpdateCount = 0;
             bool touchedGraph = false;
             if (!baselineFactor || hadLaneOverrides)
@@ -160,6 +179,7 @@ namespace RealisticPathFinding.Systems
                         float prev = _prevFactorByLane.TryGetValue(lane, out var p) ? p : 1f;
                         float ratio = (prev > 0f) ? factor / prev : factor;
 
+                        // Skip lanes that already reflect the desired factor.
                         if (math.abs(ratio - 1f) < 1e-4f)
                             continue;
 
@@ -175,6 +195,8 @@ namespace RealisticPathFinding.Systems
                     pqs.AddDataReader(default);
             }
 
+            // Once every lane is back at 1x, forget the live-graph overrides so future baseline passes
+            // can treat the graph as clean again.
             if (baselineFactor)
             {
                 _prevFactorByLane.Clear();
@@ -182,10 +204,10 @@ namespace RealisticPathFinding.Systems
 
             if (prefabUpdateCount > 0 || laneUpdateCount > 0)
             {
-                Mod.log.Info($"[RPF] PedestrianWalkCostFactorSystem: factor={factor:F3}, prefabs={prefabCount}, prefab_updates={prefabUpdateCount}, lanes_updated={laneUpdateCount}");
+                Mod.log.Info($"[RPF] PedestrianWalkCostFactorSystem: factor={factor:F3}, prefabs_total={prefabCount}, prefab_updates={prefabUpdateCount}, lanes_updated={laneUpdateCount}");
             }
 
-            this.Enabled = false; // run once; re-enabled by onSettingsApplied when settings change
+            this.Enabled = false; // Run once; re-enabled by OnSettingsApplied when settings change.
         }
 
         private static bool TryGetEdge(NativePathfindData data, Entity owner, out EdgeID id)
