@@ -5,6 +5,7 @@ using Game.Prefabs;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using RealisticPathFinding.Utils;
 
 namespace RealisticPathFinding.Systems
 {
@@ -58,8 +59,8 @@ namespace RealisticPathFinding.Systems
             // Enabled is only the scheduling flag for the next simulation tick. Skip the rerun when
             // the effective crosswalk settings are unchanged since the last apply event.
             if (_crossSettingsInitialized &&
-                math.abs(newCross - _lastCross) < 1e-4f &&
-                math.abs(newUnsafe - _lastUnsafe) < 1e-4f &&
+                PathfindCostUtils.AlmostEqual(newCross, _lastCross) &&
+                PathfindCostUtils.AlmostEqual(newUnsafe, _lastUnsafe) &&
                 newDisable == _lastDisable) return;
 
             _lastCross = newCross;
@@ -82,7 +83,7 @@ namespace RealisticPathFinding.Systems
             bool disable = Mod.m_Setting?.disable_ped_cost == true;
             float cross = disable ? 1f : math.clamp(Mod.m_Setting?.ped_crosswalk_factor ?? 1f, 0.1f, 50f);
             float unsafeCross = disable ? 1f : math.clamp(Mod.m_Setting?.ped_unsafe_crosswalk_factor ?? 1f, 0.1f, 50f);
-            bool baseline = math.abs(cross - 1f) < 1e-4f && math.abs(unsafeCross - 1f) < 1e-4f;
+            bool baseline = PathfindCostUtils.AlmostEqual(cross, 1f) && PathfindCostUtils.AlmostEqual(unsafeCross, 1f);
 
             int prefabUpdates = 0;
             // True once we have found at least one cached original that could need restoration.
@@ -118,8 +119,8 @@ namespace RealisticPathFinding.Systems
                     var cw = orig.Crosswalk; cw.m_Value *= cross;
 
                     // Avoid redundant writes and log noise when both effective crosswalk costs match.
-                    if (CostAlmostEqual(data.m_UnsafeCrosswalkCost, unsafeCw) &&
-                        CostAlmostEqual(data.m_CrosswalkCost, cw))
+                    if (PathfindCostUtils.AlmostEqual(data.m_UnsafeCrosswalkCost, unsafeCw) &&
+                        PathfindCostUtils.AlmostEqual(data.m_CrosswalkCost, cw))
                         continue;
 
                     data.m_UnsafeCrosswalkCost = unsafeCw;
@@ -144,10 +145,5 @@ namespace RealisticPathFinding.Systems
             this.Enabled = false; // Run once; re-enabled by OnSettingsApplied when settings change.
         }
 
-        private static bool CostAlmostEqual(PathfindCosts a, PathfindCosts b)
-        {
-            float4 d = math.abs(a.m_Value - b.m_Value);
-            return d.x < 1e-4f && d.y < 1e-4f && d.z < 1e-4f && d.w < 1e-4f;
-        }
     }
 }

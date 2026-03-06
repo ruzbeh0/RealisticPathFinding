@@ -5,6 +5,7 @@ using Game.Prefabs;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using RealisticPathFinding.Utils;
 using PedestrianLane = Game.Net.PedestrianLane;
 
 namespace RealisticPathFinding.Systems
@@ -70,7 +71,7 @@ namespace RealisticPathFinding.Systems
             // Enabled is just the scheduling flag for the next simulation tick. If the effective
             // pedestrian settings did not change, skip the rerun entirely.
             if (_pedSettingsInitialized &&
-                math.abs(newFactor - _lastKnownFactor) < 1e-4f &&
+                PathfindCostUtils.AlmostEqual(newFactor, _lastKnownFactor) &&
                 newDisable == _lastKnownDisable) return;
 
             _lastKnownFactor = newFactor;
@@ -101,7 +102,7 @@ namespace RealisticPathFinding.Systems
             float factor = disable
                 ? 1f
                 : math.clamp(Mod.m_Setting?.ped_walk_time_factor ?? 1.0f, 0.1f, 50f);
-            bool baselineFactor = math.abs(factor - 1f) < 1e-4f;
+            bool baselineFactor = PathfindCostUtils.AlmostEqual(factor, 1f);
 
             // 1) Prefab side: derive the current walking cost from the cached original value.
             int prefabCount = 0;
@@ -136,7 +137,7 @@ namespace RealisticPathFinding.Systems
                     walk.m_Value.x = orig.Walk.m_Value.x * factor;
 
                     // Avoid redundant writes and log noise when the effective walking cost is unchanged.
-                    if (CostAlmostEqual(data.m_WalkingCost, walk))
+                    if (PathfindCostUtils.AlmostEqual(data.m_WalkingCost, walk))
                         continue;
 
                     data.m_WalkingCost = walk;
@@ -180,7 +181,7 @@ namespace RealisticPathFinding.Systems
                         float ratio = (prev > 0f) ? factor / prev : factor;
 
                         // Skip lanes that already reflect the desired factor.
-                        if (math.abs(ratio - 1f) < 1e-4f)
+                        if (PathfindCostUtils.AlmostEqual(ratio, 1f))
                             continue;
 
                         ref var costs = ref graph.SetCosts(eid);
@@ -217,10 +218,5 @@ namespace RealisticPathFinding.Systems
             id = default; return false;
         }
 
-        private static bool CostAlmostEqual(PathfindCosts a, PathfindCosts b)
-        {
-            float4 d = math.abs(a.m_Value - b.m_Value);
-            return d.x < 1e-4f && d.y < 1e-4f && d.z < 1e-4f && d.w < 1e-4f;
-        }
     }
 }
