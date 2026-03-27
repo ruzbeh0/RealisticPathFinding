@@ -231,10 +231,12 @@ namespace RealisticPathFinding
 
         [SettingsUISlider(min = 0.1f, max = 5f, step = 0.05f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(disable_ped_cost))]
         public float ped_crosswalk_factor { get; set; }
 
         [SettingsUISlider(min = 0.1f, max = 10f, step = 0.05f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(PedestriansSection, PedestrianCrossingGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(disable_ped_cost))]
         public float ped_unsafe_crosswalk_factor { get; set; }
 
 
@@ -405,13 +407,13 @@ namespace RealisticPathFinding
             
 
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_factor)),
-                    "Crowding factor (max extra wait)" },
+                    "Crowding aversion factor" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_factor)),
-                    "At high crowding (configurable), increase perceived wait time. Example: 0.15 = +15%, 2.0 = +200% at/above capacity; 0 disables crowding entirely." },
+                    "Controls the extra perceived wait caused by crowded stops. Higher values increase the penalty after the crowding threshold, while the effect still saturates smoothly. 0 disables crowding aversion." },
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.crowdness_stop_threashold)),
                       "Crowding threshold (load ratio)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.crowdness_stop_threashold)),
-                     "Applies crowding penalty when the number of people at a stop reaches or exceeds this fraction of vehicle capacity (0–1). Example: 0.5 means crowding begins when the stop is half a vehicle’s capacity." },
+                     "Crowding aversion starts when the number of people at a stop reaches this fraction of vehicle capacity (0–1). Example: 0.5 means crowding discomfort begins when the stop is half a vehicle’s capacity. Separate extra wait can still appear once the queue exceeds one full vehicle load." },
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)), "Non-bus on bus-only lane penalty (s)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.nonbus_buslane_penalty_sec)),  "Extra time penalty per bus-only segment for non-bus vehicles. 0 = off." },
 
@@ -539,8 +541,8 @@ namespace RealisticPathFinding
             "Walking cost multiplier" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.ped_walk_time_factor)),
             "Multiplies the pedestrian walking cost. 1.0 = no change; higher values make walking less attractive overall." },
-            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.disable_ped_cost)), "Disable walking cost multiplier" },
-                { m_Setting.GetOptionDescLocaleID(nameof(Setting.disable_ped_cost)), $"Disable walking cost multiplier. This will make this mod more compatible with other mods that affect pedestrian pathfinding" },
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.disable_ped_cost)), "Disable pedestrian cost adjustments" },
+                { m_Setting.GetOptionDescLocaleID(nameof(Setting.disable_ped_cost)), "Disables all pedestrian cost adjustments from this mod (walking multiplier and crosswalk factors) and restores baseline pedestrian costs for better mod compatibility." },
 
             // Group under Vehicles
             { m_Setting.GetOptionGroupLocaleID(Setting.CongestionGroup), "Congestion feedback" },

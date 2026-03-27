@@ -24,7 +24,7 @@ A Cities: Skylines II mod that replaces the vanilla pathfinding cost model with 
 | **Transfer penalty** | Applies an extra multiplier to wait time at each transfer. |
 | **Feeder→trunk transfer penalty** | Separate multiplier for transferring from a bus/tram to metro/train/ship. |
 | **Scheduled mode wait factor** | Reduces (or increases) perceived wait for rail and ship modes. |
-| **Crowding penalty** | Increases perceived wait at stops that are near or above a configurable capacity threshold. |
+| **Crowding penalty** | Adds a saturating crowding-aversion penalty near a configurable threshold and extra expected wait once the queue exceeds roughly one vehicle load. |
 | **Mode weights** | Individual in-vehicle time multipliers for bus, tram, subway, train, and ferry. |
 | **Bus lane penalty** | Adds a time penalty for non-bus vehicles using bus-only lanes. |
 
