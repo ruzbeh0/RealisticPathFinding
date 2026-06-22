@@ -13,7 +13,7 @@ namespace RealisticPathFinding.Systems
 {
     /// <summary>
     /// Car cost shaping:
-    ///  • Turn penalties based on turn angle (+ optional U-turn bonus seconds)
+    ///  • Turn penalties based on turn angle (+ optional extra U-turn seconds)
     ///  • Road hierarchy bias via density adders (collector/local/very local)
     ///  • Bus-only lane penalty: extra behavior-time seconds for non-bus vehicles
     ///
@@ -53,7 +53,7 @@ namespace RealisticPathFinding.Systems
 
             // U-turn
             public float UTurnThresholdDeg;  // e.g., 150
-            public float UTurnBonusSec;      // e.g., +5s
+            public float UTurnBonusSec;      // optional extra RPF penalty
         }
 
         // ----------------------- Results -----------------------
@@ -121,7 +121,7 @@ namespace RealisticPathFinding.Systems
                 BiasLocal          = s?.local_bias ?? 0.10f,
                 BiasVeryLocal      = s?.alleyway_bias ?? 0.15f,
                 UTurnThresholdDeg  = s?.uturn_threshold_deg ?? 150f,
-                UTurnBonusSec      = s?.uturn_sec_penalty ?? 5f,
+                UTurnBonusSec      = s?.uturn_sec_penalty ?? 0f,
             };
 
             if (_cfgInitialized && ConfigEquals(_lastCfg, newCfg)) return;
@@ -149,6 +149,9 @@ namespace RealisticPathFinding.Systems
         // ----------------------- Update ------------------------
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             // Refresh lookups
             _curveLk = GetComponentLookup<Curve>(true);
             _prefabLk = GetComponentLookup<PrefabRef>(true);
@@ -180,13 +183,11 @@ namespace RealisticPathFinding.Systems
                 BiasLocal = s?.local_bias ?? 0.10f,
                 BiasVeryLocal = s?.alleyway_bias ?? 0.15f,
                 UTurnThresholdDeg = s?.uturn_threshold_deg ?? 150f,
-                UTurnBonusSec = s?.uturn_sec_penalty ?? 5f,
+                UTurnBonusSec = s?.uturn_sec_penalty ?? 0f,
             };
 
-            int laneN = _laneQ.CalculateEntityCount();
-
-            var turnResults = new NativeList<TurnResult>(math.max(1, laneN), Allocator.TempJob);
-            var densResults = new NativeList<DensityResult>(math.max(1, laneN), Allocator.TempJob);
+            var turnResults = new NativeQueue<TurnResult>(Allocator.TempJob);
+            var densResults = new NativeQueue<DensityResult>(Allocator.TempJob);
 
             // 1) Hierarchy bias + Bus-only detection
             new LaneScanJob
@@ -200,7 +201,7 @@ namespace RealisticPathFinding.Systems
                 BiasVeryLocal = cfg.BiasVeryLocal,
 
                 Results = densResults.AsParallelWriter(),
-            }.ScheduleParallel(_laneQ, default).Complete();
+            }.ScheduleParallel(_laneQ, Dependency).Complete();
 
             // 2) Turn scan (angle → seconds)
             new TurnScanJob
@@ -212,7 +213,7 @@ namespace RealisticPathFinding.Systems
                 UTurnThresholdDeg = cfg.UTurnThresholdDeg,
                 UTurnBonusSec = cfg.UTurnBonusSec,
                 TurnResults = turnResults.AsParallelWriter()
-            }.ScheduleParallel(_laneQ, default).Complete();
+            }.ScheduleParallel(_laneQ, Dependency).Complete();
 
             // 3) MAIN THREAD: commit deltas to pathfind data
             var pqs = World.GetOrCreateSystemManaged<PathfindQueueSystem>();
@@ -221,9 +222,8 @@ namespace RealisticPathFinding.Systems
             // A) Turn seconds (behavior-time channel)
             int turnApplied = 0;
             int turnEdgeMiss = 0;
-            for (int i = 0; i < turnResults.Length; i++)
+            while (turnResults.TryDequeue(out var r))
             {
-                var r = turnResults[i];
                 if (!TryGetEdge(data, r.Owner, out var eid))
                 {
                     turnEdgeMiss++;
@@ -243,9 +243,8 @@ namespace RealisticPathFinding.Systems
             // C) Hierarchy density adders
             int densApplied = 0;
             int densEdgeMiss = 0;
-            for (int i = 0; i < densResults.Length; i++)
+            while (densResults.TryDequeue(out var r))
             {
-                var r = densResults[i];
                 if (!TryGetEdge(data, r.Owner, out var eid))
                 {
                     densEdgeMiss++;
@@ -312,7 +311,7 @@ namespace RealisticPathFinding.Systems
             public float UTurnThresholdDeg;
             public float UTurnBonusSec;
 
-            [WriteOnly] public NativeList<TurnResult>.ParallelWriter TurnResults;
+            [WriteOnly] public NativeQueue<TurnResult>.ParallelWriter TurnResults;
 
             public void Execute(Entity e, in Lane lane, in PrefabRef pr)
             {
@@ -338,7 +337,7 @@ namespace RealisticPathFinding.Systems
                 if (angleDeg >= UTurnThresholdDeg && UTurnBonusSec > 0f)
                     secs += UTurnBonusSec;
 
-                TurnResults.AddNoResize(new TurnResult { Owner = e, Seconds = secs });
+                TurnResults.Enqueue(new TurnResult { Owner = e, Seconds = secs });
             }
         }
 
@@ -351,7 +350,7 @@ namespace RealisticPathFinding.Systems
 
             public float BiasCollector, BiasLocal, BiasVeryLocal;
 
-            [WriteOnly] public NativeList<DensityResult>.ParallelWriter Results;
+            [WriteOnly] public NativeQueue<DensityResult>.ParallelWriter Results;
 
             public void Execute(Entity e, in Lane lane, in PrefabRef pr)
             {
@@ -372,7 +371,7 @@ namespace RealisticPathFinding.Systems
                     }
                 }
 
-                Results.AddNoResize(new DensityResult { Owner = e, AddDensity = add });
+                Results.Enqueue(new DensityResult { Owner = e, AddDensity = add });
             }
         }
     }

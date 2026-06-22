@@ -96,6 +96,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             // Re-read settings when the pass executes. "Disable" means restore baseline walking costs
             // from cached originals; it is not the same thing as disabling the system scheduler.
             bool disable = Mod.m_Setting?.disable_ped_cost == true;

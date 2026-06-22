@@ -1,15 +1,15 @@
 ﻿// RPFPatches_BusLanePenalty.cs
-using Game.Net;
 using Game.Pathfind;
-using Game.Prefabs;
 using HarmonyLib;
 using Unity.Mathematics;
-using CarLane = Game.Net.CarLane;
 
-// Disambiguation aliases (optional but keeps the attributes tidy)
 using NetCarLane = Game.Net.CarLane;
+using NetCurve = Game.Net.Curve;
+using NetMasterLane = Game.Net.MasterLane;
 using NetTrackLane = Game.Net.TrackLane;
 using PrefabCarLaneData = Game.Prefabs.CarLaneData;
+using PrefabPathfindCarData = Game.Prefabs.PathfindCarData;
+using PrefabPathfindTransportData = Game.Prefabs.PathfindTransportData;
 
 namespace RealisticPathFinding.Patches
 {
@@ -18,6 +18,18 @@ namespace RealisticPathFinding.Patches
         // Use your existing seconds slider; clamp so 0 disables
         public static float Seconds =>
             math.max(0f, Mod.m_Setting?.nonbus_buslane_penalty_sec ?? 0f);
+
+        public static void AddPenalty(ref PathSpecification specification, in NetCarLane carLane)
+        {
+            float sec = Seconds;
+            if (sec <= 0f) return;
+
+            if ((carLane.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0)
+            {
+                PathUtils.TryAddCosts(ref specification.m_Costs,
+                    new PathfindCosts { m_Value = new float4(sec, 0f, 0f, 0f) });
+            }
+        }
     }
 
     // Overload 1:
@@ -28,27 +40,17 @@ namespace RealisticPathFinding.Patches
     //   PathfindCarData carPathfindData,
     //   float density)
     [HarmonyPatch(typeof(PathUtils), nameof(PathUtils.GetCarDriveSpecification),
-        new[] { typeof(Curve),                    // Colossal.Mathematics.Curve
-        typeof(CarLane),                  // Game.Net.CarLane
-        typeof(MasterLane),               // Game.Net.MasterLane
-        typeof(CarLaneData),              // Game.Net.CarLaneData
-        typeof(PathfindCarData),          // Game.Pathfind.PathfindCarData
-        typeof(RuleFlags),                // Game.Pathfind.RuleFlags
+        new[] { typeof(NetCurve),
+        typeof(NetCarLane),
+        typeof(NetMasterLane),
+        typeof(PrefabCarLaneData),
+        typeof(PrefabPathfindCarData),
+        typeof(RuleFlags),
         typeof(float)})]
     static class Patch_GetCarDriveSpecification_Road
     {
-        static void Postfix(ref PathSpecification __result, ref NetCarLane carLane)
-        {
-            float sec = BusLanePenaltyConfig.Seconds;
-            if (sec <= 0f) return;
-
-            if ((carLane.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0)
-            {
-                // Add time-like cost to the TIME channel (x)
-                PathUtils.TryAddCosts(ref __result.m_Costs,
-                    new PathfindCosts { m_Value = new float4(sec, 0f, 0f, 0f) });
-            }
-        }
+        static void Postfix(ref PathSpecification __result, ref NetCarLane carLane) =>
+            BusLanePenaltyConfig.AddPenalty(ref __result, in carLane);
     }
 
     // Overload 2:
@@ -60,29 +62,21 @@ namespace RealisticPathFinding.Patches
     //   PathfindCarData carPathfindData,
     //   float density)
     [HarmonyPatch(typeof(PathUtils), nameof(PathUtils.GetCarDriveSpecification),
-        new[] { typeof(Curve),                    // Colossal.Mathematics.Curve
-        typeof(CarLane),                  // Game.Net.CarLane
-        typeof(MasterLane),               // Game.Net.MasterLane
-        typeof(CarLaneData),              // Game.Net.CarLaneData
-        typeof(PathfindCarData),          // Game.Pathfind.PathfindCarData
-        typeof(RuleFlags),                // Game.Pathfind.RuleFlags
+        new[] { typeof(NetCurve),
+        typeof(NetCarLane),
+        typeof(NetMasterLane),
+        typeof(NetTrackLane),
+        typeof(PrefabCarLaneData),
+        typeof(PrefabPathfindCarData),
+        typeof(RuleFlags),
         typeof(float) })]
     static class Patch_GetCarDriveSpecification_RoadWithTrack
     {
-        static void Postfix(ref PathSpecification __result, ref NetCarLane carLane)
-        {
-            float sec = BusLanePenaltyConfig.Seconds;
-            if (sec <= 0f) return;
-
-            if ((carLane.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0)
-            {
-                PathUtils.TryAddCosts(ref __result.m_Costs,
-                    new PathfindCosts { m_Value = new float4(sec, 0f, 0f, 0f) });
-            }
-        }
+        static void Postfix(ref PathSpecification __result, ref NetCarLane carLane) =>
+            BusLanePenaltyConfig.AddPenalty(ref __result, in carLane);
     }
 
-    // Taxis: remove the same amount so taxis are not discouraged
+    // Taxis use a separate spec path, so apply the same non-bus lane penalty there.
     // public static PathSpecification GetTaxiDriveSpecification(
     //   Curve curveData,
     //   Game.Net.CarLane carLaneData,
@@ -90,24 +84,15 @@ namespace RealisticPathFinding.Patches
     //   PathfindTransportData transportPathfindData,
     //   float density)
     [HarmonyPatch(typeof(PathUtils), nameof(PathUtils.GetTaxiDriveSpecification),
-        new[] { typeof(Curve),               // Colossal.Mathematics.Curve
-        typeof(CarLane),             // Game.Net.CarLane
-        typeof(PathfindCarData),     // Game.Pathfind.PathfindCarData
-        typeof(PathfindTransportData), // Game.Pathfind.PathfindTransportData
-        typeof(RuleFlags),           // Game.Pathfind.RuleFlags
+        new[] { typeof(NetCurve),
+        typeof(NetCarLane),
+        typeof(PrefabPathfindCarData),
+        typeof(PrefabPathfindTransportData),
+        typeof(RuleFlags),
         typeof(float) })]
     static class Patch_GetTaxiDriveSpecification
     {
-        static void Postfix(ref PathSpecification __result, ref NetCarLane carLaneData)
-        {
-            float sec = BusLanePenaltyConfig.Seconds;
-            if (sec <= 0f) return;
-
-            if ((carLaneData.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0)
-            {
-                PathUtils.TryAddCosts(ref __result.m_Costs,
-                    new PathfindCosts { m_Value = new float4(-sec, 0f, 0f, 0f) });
-            }
-        }
+        static void Postfix(ref PathSpecification __result, ref NetCarLane carLaneData) =>
+            BusLanePenaltyConfig.AddPenalty(ref __result, in carLaneData);
     }
 }

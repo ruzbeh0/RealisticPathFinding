@@ -135,6 +135,9 @@ public partial class RPFResidentAISystem : GameSystemBase
     [UnityEngine.Scripting.Preserve]
     protected override void OnUpdate()
     {
+        if (SimulationGuard.IsGameLoading())
+            return;
+
         uint index = this.m_SimulationSystem.frameIndex % 16U /*0x10*/;
         this.m_CreatureQuery.SetSharedComponentFilter<UpdateFrame>(new UpdateFrame(index));
         this.m_GroupCreatureQuery.SetSharedComponentFilter<UpdateFrame>(new UpdateFrame(index));
@@ -4009,7 +4012,11 @@ public partial class RPFResidentAISystem : GameSystemBase
                     Game.Vehicles.PersonalCar componentData5;
                     // ISSUE: reference to a compiler-generated field
                     if (this.m_PersonalCarData.TryGetComponent(component1.m_Car, out componentData5) && (componentData5.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
+                    {
                         parameters.m_PathfindFlags |= PathfindFlags.ParkingReset;
+                        if (property != Entity.Null && target.m_Target == property)
+                            parameters.m_Methods &= ~(RouteUtils.GetTaxiMethods(resident) | RouteUtils.GetPublicTransportMethods(resident, this.m_TimeOfDay));
+                    }
                 }
             }
             else
@@ -4083,39 +4090,19 @@ public partial class RPFResidentAISystem : GameSystemBase
             // ISSUE: reference to a compiler-generated field
             if (this.m_TravelPurposeData.TryGetComponent(resident.m_Citizen, out componentData12))
             {
-                Game.Citizens.Purpose purpose = componentData12.m_Purpose;
-                if ((uint)purpose <= 12U)
+                switch (componentData12.m_Purpose)
                 {
-                    switch (purpose)
-                    {
-                        case Game.Citizens.Purpose.MovingAway:
-                            // ISSUE: reference to a compiler-generated field
-                            parameters.m_MaxCost = CitizenBehaviorSystem.kMaxMovingAwayCost;
-                            goto label_28;
-                        case Game.Citizens.Purpose.Hospital:
-                            break;
-                        default:
-                            goto label_28;
-                    }
+                    case Game.Citizens.Purpose.Hospital:
+                    case Game.Citizens.Purpose.Deathcare:
+                        HealthProblem componentData13;
+                        // ISSUE: reference to a compiler-generated field
+                        flag = this.m_HealthProblemData.TryGetComponent(resident.m_Citizen, out componentData13) && (componentData13.m_Flags & HealthProblemFlags.RequireTransport) != 0;
+                        break;
+                    case Game.Citizens.Purpose.EmergencyShelter:
+                        parameters.m_Weights = new PathfindWeights(1f, 0.2f, 0.0f, 0.1f);
+                        break;
                 }
-                else
-                {
-                    switch (purpose)
-                    {
-                        case Game.Citizens.Purpose.EmergencyShelter:
-                            parameters.m_Weights = new PathfindWeights(1f, 0.2f, 0.0f, 0.1f);
-                            goto label_28;
-                        case Game.Citizens.Purpose.Deathcare:
-                            break;
-                        default:
-                            goto label_28;
-                    }
-                }
-                HealthProblem componentData13;
-                // ISSUE: reference to a compiler-generated field
-                flag = this.m_HealthProblemData.TryGetComponent(resident.m_Citizen, out componentData13) && (componentData13.m_Flags & HealthProblemFlags.RequireTransport) != 0;
             }
-        label_28:
             // ----------------------------------------------------------------
             // RPF: stochastic route choice using choice_tau
             // ----------------------------------------------------------------

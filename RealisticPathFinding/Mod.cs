@@ -34,11 +34,11 @@ namespace RealisticPathFinding
                 log.Info($"Current mod asset at {asset.path}");
 
             m_Setting = new Setting(this);
+            AssetDatabase.global.LoadSettings(nameof(RealisticPathFinding), m_Setting, new Setting(this));
             m_Setting.RegisterInOptionsUI();
             GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(m_Setting));
 
-
-            AssetDatabase.global.LoadSettings(nameof(RealisticPathFinding), m_Setting, new Setting(this));
+            EnsureSettingsFileExists();
 
             bool realisticTripsMod = false;
             foreach (var modInfo in GameManager.instance.modManager)
@@ -67,6 +67,7 @@ namespace RealisticPathFinding
             //updateSystem.UpdateAfter<RealisticPathFinding.Systems.RPFResidentAISystem, Game.Simulation.ResidentAISystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.WalkSpeedUpdaterSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.CarTurnAndHierarchyBiasSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<RealisticPathFinding.Systems.CarPrefabTurnCostFactorSystem, Game.Pathfind.LanesModifiedSystem>(SystemUpdatePhase.ModificationEnd);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianWalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.PedestrianCrosswalkCostFactorSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAt<RealisticPathFinding.Systems.TaxiStandCrowdingSystem>(SystemUpdatePhase.GameSimulation);
@@ -98,6 +99,16 @@ namespace RealisticPathFinding
                 m_Setting.UnregisterInOptionsUI();
                 m_Setting = null;
             }
+        }
+
+        private static void EnsureSettingsFileExists()
+        {
+            string settingsFile = Path.Combine(SettingsFolder, $"{nameof(RealisticPathFinding)}.coc");
+            if (File.Exists(settingsFile))
+                return;
+
+            m_Setting.ApplyAndSave();
+            log.Info($"Created default settings file at {settingsFile}");
         }
     }
 }

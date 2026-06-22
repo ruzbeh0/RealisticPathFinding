@@ -43,6 +43,7 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
     private EntityQuery m_EconomyParameterQuery;
     private EntityQuery m_ResidentPrefabQuery;
     private EntityQuery m_PopulationQuery;
+    private EntityQuery m_TripPriorityParametersQuery;
     private ComponentTypeSet m_PathfindTypes;
     private EndFrameBarrier m_EndFrameBarrier;
     private PathfindSetupSystem m_PathfindSetupSystem;
@@ -122,11 +123,15 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
         // ISSUE: reference to a compiler-generated field
         this.m_PathfindTypes = new ComponentTypeSet(ComponentType.ReadWrite<PathInformation>(), ComponentType.ReadWrite<PathElement>());
         // ISSUE: reference to a compiler-generated field
+        this.m_TripPriorityParametersQuery = this.GetEntityQuery(ComponentType.ReadOnly<TripPriorityParametersData>());
+        // ISSUE: reference to a compiler-generated field
         this.RequireForUpdate(this.m_BuyerQuery);
         // ISSUE: reference to a compiler-generated field
         this.RequireForUpdate(this.m_EconomyParameterQuery);
         // ISSUE: reference to a compiler-generated field
         this.RequireForUpdate(this.m_PopulationQuery);
+        // ISSUE: reference to a compiler-generated field
+        this.RequireForUpdate(this.m_TripPriorityParametersQuery);
     }
 
     [UnityEngine.Scripting.Preserve]
@@ -143,6 +148,9 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
     [UnityEngine.Scripting.Preserve]
     protected override void OnUpdate()
     {
+        if (SimulationGuard.IsGameLoading())
+            return;
+
         // ISSUE: reference to a compiler-generated field
         if (this.m_BuyerQuery.CalculateEntityCount() <= 0)
             return;
@@ -296,6 +304,7 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
             m_PathfindQueue = this.m_PathfindSetupSystem.GetQueue((object)this, 80 /*0x50*/, 16 /*0x10*/).AsParallelWriter(),
             m_CommandBuffer = this.m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter(),
             m_EconomyParameterData = this.m_EconomyParameterQuery.GetSingleton<EconomyParameterData>(),
+            m_TripPriorityParameters = this.m_TripPriorityParametersQuery.GetSingleton<TripPriorityParametersData>(),
             m_City = this.m_CitySystem.City,
             m_SalesQueue = this.m_SalesQueue.AsParallelWriter()
         };
@@ -845,6 +854,8 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
         public EntityCommandBuffer.ParallelWriter m_CommandBuffer;
         public NativeQueue<SetupQueueItem>.ParallelWriter m_PathfindQueue;
         public EconomyParameterData m_EconomyParameterData;
+        [ReadOnly]
+        public TripPriorityParametersData m_TripPriorityParameters;
         public Entity m_City;
         public NativeQueue<RPFResourceBuyerSystem.SalesEvent>.ParallelWriter m_SalesQueue;
 
@@ -945,27 +956,34 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
                         // ISSUE: reference to a compiler-generated field
                         if (this.m_Properties.HasComponent(destination) | flag1)
                         {
-                            // ISSUE: reference to a compiler-generated field
-                            DynamicBuffer<Game.Economy.Resources> resource = this.m_Resources[destination];
-                            int resources = EconomyUtils.GetResources(resourceBuyingRequest.m_ResourceNeeded, resource);
-                            // ISSUE: reference to a compiler-generated field
-                            if (this.m_StorageCompanies.HasComponent(destination))
+                            int availableResources;
+                            if (virtualGood & flag1)
                             {
-                                // ISSUE: reference to a compiler-generated field
-                                // ISSUE: reference to a compiler-generated field
-                                // ISSUE: reference to a compiler-generated field
-                                int buyingResourcesTrucks = VehicleUtils.GetAllBuyingResourcesTrucks(destination, resourceBuyingRequest.m_ResourceNeeded, ref this.m_DeliveryTrucks, ref this.m_GuestVehicles, ref this.m_LayoutElements);
-                                resources -= buyingResourcesTrucks;
-                            }
-                            if (resources <= 0 || !flag1 && resources < resourceBuyingRequest.m_AmountNeeded / 2)
-                            {
-                                // ISSUE: reference to a compiler-generated field
-                                // ISSUE: reference to a compiler-generated field
-                                this.m_CommandBuffer.RemoveComponent(unfilteredChunkIndex, entity, in this.m_PathfindTypes);
+                                availableResources = resourceBuyingRequest.m_AmountNeeded;
                             }
                             else
                             {
-                                resourceBuyingRequest.m_AmountNeeded = math.min(resourceBuyingRequest.m_AmountNeeded, resources);
+                                // ISSUE: reference to a compiler-generated field
+                                DynamicBuffer<Game.Economy.Resources> resource = this.m_Resources[destination];
+                                availableResources = EconomyUtils.GetResources(resourceBuyingRequest.m_ResourceNeeded, resource);
+                                // ISSUE: reference to a compiler-generated field
+                                if (this.m_StorageCompanies.HasComponent(destination))
+                                {
+                                    // ISSUE: reference to a compiler-generated field
+                                    // ISSUE: reference to a compiler-generated field
+                                    // ISSUE: reference to a compiler-generated field
+                                    int buyingResourcesTrucks = VehicleUtils.GetAllBuyingResourcesTrucks(destination, resourceBuyingRequest.m_ResourceNeeded, ref this.m_DeliveryTrucks, ref this.m_GuestVehicles, ref this.m_LayoutElements);
+                                    availableResources -= buyingResourcesTrucks;
+                                }
+                                if (availableResources <= 0 || !flag1 && availableResources < resourceBuyingRequest.m_AmountNeeded / 2)
+                                {
+                                    // ISSUE: reference to a compiler-generated field
+                                    // ISSUE: reference to a compiler-generated field
+                                    this.m_CommandBuffer.RemoveComponent(unfilteredChunkIndex, entity, in this.m_PathfindTypes);
+                                    continue;
+                                }
+                            }
+                            resourceBuyingRequest.m_AmountNeeded = math.min(resourceBuyingRequest.m_AmountNeeded, availableResources);
                                 // ISSUE: reference to a compiler-generated field
                                 int num1 = this.m_ServiceAvailables.HasComponent(destination) ? 1 : 0;
                                 // ISSUE: reference to a compiler-generated field
@@ -1041,7 +1059,8 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
                                         m_TargetAgent = destination,
                                         m_Purpose = flag2 ? Game.Citizens.Purpose.CompanyShopping : Game.Citizens.Purpose.Shopping,
                                         m_Data = resourceBuyingRequest.m_AmountNeeded,
-                                        m_Resource = resourceBuyingRequest.m_ResourceNeeded
+                                        m_Resource = resourceBuyingRequest.m_ResourceNeeded,
+                                        m_Priority = 128
                                     });
                                     // ISSUE: reference to a compiler-generated field
                                     if (!this.m_Targets.HasComponent(entities[index]))
@@ -1053,7 +1072,6 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
                                         });
                                     }
                                 }
-                            }
                         }
                         else
                         {
@@ -1154,6 +1172,8 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
           int householdCitizenCount,
           bool virtualGood)
         {
+            if (virtualGood)
+                flags |= SetupTargetFlags.Import;
             // ISSUE: reference to a compiler-generated field
             // ISSUE: reference to a compiler-generated field
             this.m_CommandBuffer.AddComponent(index, buyer, in this.m_PathfindTypes);
@@ -1184,7 +1204,7 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
                 m_Weights = CitizenUtils.GetPathfindWeights(citizenData, householdData, householdCitizenCount),
                 m_Methods = PathMethod.Pedestrian | PathMethod.Taxi | RouteUtils.GetPublicTransportMethods(this.m_TimeOfDay),
                 m_TaxiIgnoredRules = VehicleUtils.GetIgnoredPathfindRulesTaxiDefaults(),
-                m_MaxCost = CitizenBehaviorSystem.kMaxPathfindCost
+                m_MaxCost = this.m_TripPriorityParameters.GetMaxCost(this.m_TripPriorityParameters.m_PriorityShopping)
             };
             SetupQueueTarget setupQueueTarget = new SetupQueueTarget();
             setupQueueTarget.m_Type = SetupTargetType.CurrentLocation;
@@ -1318,12 +1338,12 @@ public partial class RPFResourceBuyerSystem : GameSystemBase
             });
             // ISSUE: reference to a compiler-generated field
             // ISSUE: reference to a compiler-generated field
-            float transportCost = EconomyUtils.GetTransportCost(100f, amount, this.m_ResourceDatas[this.m_ResourcePrefabs[resource]].m_Weight, StorageTransferFlags.Car);
+            float transportCost = EconomyUtils.GetTransportCost(1f, amount, this.m_ResourceDatas[this.m_ResourcePrefabs[resource]].m_Weight, StorageTransferFlags.Car);
             PathfindParameters parameters = new PathfindParameters()
             {
                 m_MaxSpeed = (float2)111.111115f,
                 m_WalkSpeed = (float2)5.555556f,
-                m_Weights = new PathfindWeights(1f, 1f, transportCost, 1f),
+                m_Weights = new PathfindWeights(0.01f, 0.01f, transportCost, 0.01f),
                 m_Methods = PathMethod.Road | PathMethod.CargoLoading,
                 m_IgnoredRules = RuleFlags.ForbidSlowTraffic | RuleFlags.AvoidBicycles
             };

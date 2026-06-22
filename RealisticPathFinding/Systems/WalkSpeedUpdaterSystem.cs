@@ -77,6 +77,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             // Final per-age mph, then convert to m/s
             _mpsChild = Mod.m_Setting.average_walk_speed_child * MPH_TO_MPS;
             _mpsTeen = Mod.m_Setting.average_walk_speed_teen * MPH_TO_MPS;

@@ -38,6 +38,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             var settings = Mod.m_Setting;
             if (settings == null)
                 return;

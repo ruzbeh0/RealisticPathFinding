@@ -10,7 +10,7 @@ A Cities: Skylines II mod that replaces the vanilla pathfinding cost model with 
 
 | Feature | Description |
 | --- | --- |
-| **Turn penalties** | Adds a time cost for sharp turns, scaled by angle. U-turns carry an extra fixed penalty. |
+| **Turn penalties** | Scales the game's built-in sharp-turn/U-turn costs and adds optional RPF angle-based penalties. |
 | **Road hierarchy bias** | Adds a density cost to collector, local, and alleyway roads, pushing traffic toward higher-class roads. |
 | **Congestion feedback (EWMA)** | Monitors real in-game travel times per lane and feeds live congestion back into routing costs via exponential smoothing. |
 | **Car mode weight** | Scales perceived in-vehicle car time to balance car vs. public transport attractiveness. |
@@ -60,7 +60,10 @@ All settings are available in **Options → Realistic Path Finding**.
 | Setting | Default | Notes |
 | --- | --- | --- |
 | Car mode weight | 0.90 | Slightly favours car over transit |
+| Game turn cost multiplier | 0.50 | Reduces the game's 1.5.9 sharp-turn avoidance |
+| Game U-turn cost multiplier | 0.35 | Reduces the game's 1.5.9 U-turn avoidance |
 | Base turn penalty | 2 s | Per sharp turn |
+| Additional RPF U-turn penalty | 0 s | Advanced extra layer, off by default |
 | Collector bias | 0.05 | Mild highway preference |
 | Local bias | 0.10 | Discourages cut-throughs |
 | Alleyway bias | 0.15 | Strong preference away from alleys |

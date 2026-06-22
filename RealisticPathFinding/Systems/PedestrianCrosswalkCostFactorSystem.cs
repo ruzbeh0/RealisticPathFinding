@@ -78,6 +78,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             // Re-read settings when the pass executes. "Disable" means restore baseline 1x costs
             // from cached originals; it is not interchangeable with the system's Enabled flag.
             bool disable = Mod.m_Setting?.disable_ped_cost == true;

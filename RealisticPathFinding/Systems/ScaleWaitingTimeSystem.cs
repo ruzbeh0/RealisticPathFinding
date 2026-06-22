@@ -13,6 +13,9 @@ namespace RealisticPathFinding.Systems
     {
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             // Pull your factor from settings or your Time2WorkInterop (managed ok here)
             float factor = Time2WorkInterop.GetFactor(); // return 1f if Time2Work absent
 

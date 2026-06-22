@@ -47,6 +47,7 @@ public partial class RPFTripNeededSystem : GameSystemBase
     private EntityQuery m_ResidentPrefabGroup;
     private EntityQuery m_CompanyGroup;
     private EntityQuery m_CarPrefabQuery;
+    private EntityQuery m_TripPriorityParametersQuery;
     private EntityArchetype m_HandleRequestArchetype;
     private EntityArchetype m_ResetTripArchetype;
     private ComponentTypeSet m_HumanSpawnTypes;
@@ -55,6 +56,7 @@ public partial class RPFTripNeededSystem : GameSystemBase
     private PersonalCarSelectData m_PersonalCarSelectData;
     private EndFrameBarrier m_EndFrameBarrier;
     private TimeSystem m_TimeSystem;
+    private SimulationSystem m_SimulationSystem;
     private PathfindSetupSystem m_PathfindSetupSystem;
     private CityConfigurationSystem m_CityConfigurationSystem;
     private VehicleCapacitySystem m_VehicleCapacitySystem;
@@ -118,6 +120,8 @@ public partial class RPFTripNeededSystem : GameSystemBase
         // ISSUE: reference to a compiler-generated field
         this.m_TimeSystem = this.World.GetOrCreateSystemManaged<TimeSystem>();
         // ISSUE: reference to a compiler-generated field
+        this.m_SimulationSystem = this.World.GetOrCreateSystemManaged<SimulationSystem>();
+        // ISSUE: reference to a compiler-generated field
         this.m_CityConfigurationSystem = this.World.GetOrCreateSystemManaged<CityConfigurationSystem>();
         // ISSUE: reference to a compiler-generated field
         this.m_VehicleCapacitySystem = this.World.GetOrCreateSystemManaged<VehicleCapacitySystem>();
@@ -133,6 +137,10 @@ public partial class RPFTripNeededSystem : GameSystemBase
         this.m_CompanyGroup = this.GetEntityQuery(ComponentType.ReadWrite<TripNeeded>(), ComponentType.ReadOnly<PrefabRef>(), ComponentType.ReadWrite<Game.Economy.Resources>(), ComponentType.ReadOnly<OwnedVehicle>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
         // ISSUE: reference to a compiler-generated field
         this.m_CarPrefabQuery = this.GetEntityQuery(PersonalCarSelectData.GetEntityQueryDesc());
+        // ISSUE: reference to a compiler-generated field
+        this.m_TripPriorityParametersQuery = this.GetEntityQuery(ComponentType.ReadOnly<TripPriorityParametersData>());
+        // ISSUE: reference to a compiler-generated field
+        this.RequireForUpdate(this.m_TripPriorityParametersQuery);
         // ISSUE: reference to a compiler-generated field
         this.m_HandleRequestArchetype = this.EntityManager.CreateArchetype(ComponentType.ReadWrite<HandleRequest>(), ComponentType.ReadWrite<Game.Events.Event>());
         // ISSUE: reference to a compiler-generated field
@@ -188,6 +196,9 @@ public partial class RPFTripNeededSystem : GameSystemBase
     [UnityEngine.Scripting.Preserve]
     protected override void OnUpdate()
     {
+        if (SimulationGuard.IsGameLoading())
+            return;
+
         JobHandle outJobHandle;
         // ISSUE: reference to a compiler-generated field
         NativeList<ArchetypeChunk> archetypeChunkListAsync = this.m_ResidentPrefabGroup.ToArchetypeChunkListAsync((AllocatorManager.AllocatorHandle)Allocator.TempJob, out outJobHandle);
@@ -443,9 +454,12 @@ public partial class RPFTripNeededSystem : GameSystemBase
                 m_Households = InternalCompilerInterface.GetComponentLookup<Household>(ref this.__TypeHandle.__Game_Citizens_Household_RO_ComponentLookup, ref this.CheckedStateRef),
                 m_HouseholdCitizens = InternalCompilerInterface.GetBufferLookup<HouseholdCitizen>(ref this.__TypeHandle.__Game_Citizens_HouseholdCitizen_RO_BufferLookup, ref this.CheckedStateRef),
                 m_CriminalData = InternalCompilerInterface.GetComponentLookup<Criminal>(ref this.__TypeHandle.__Game_Citizens_Criminal_RO_ComponentLookup, ref this.CheckedStateRef),
+                m_LeisureSeekerCooldowns = InternalCompilerInterface.GetComponentLookup<LeisureSeekerCooldown>(ref this.__TypeHandle.__Game_Citizens_LeisureSeekerCooldown_RO_ComponentLookup, ref this.CheckedStateRef),
                 m_HumanChunks = archetypeChunkListAsync,
                 m_RandomSeed = RandomSeed.Next(),
                 m_TimeOfDay = this.m_TimeSystem.normalizedTime,
+                m_SimulationFrame = this.m_SimulationSystem.frameIndex,
+                m_TripPriorityParameters = this.m_TripPriorityParametersQuery.GetSingleton<TripPriorityParametersData>(),
                 m_ResetTripArchetype = this.m_ResetTripArchetype,
                 m_HumanSpawnTypes = this.m_HumanSpawnTypes,
                 m_PathfindTypes = this.m_PathfindTypes,
@@ -1195,6 +1209,8 @@ public partial class RPFTripNeededSystem : GameSystemBase
         public BufferLookup<HouseholdCitizen> m_HouseholdCitizens;
         [ReadOnly]
         public ComponentLookup<Criminal> m_CriminalData;
+        [ReadOnly]
+        public ComponentLookup<LeisureSeekerCooldown> m_LeisureSeekerCooldowns;
         [NativeDisableParallelForRestriction]
         public ComponentLookup<CoordinatedMeeting> m_Meetings;
         [NativeDisableParallelForRestriction]
@@ -1207,6 +1223,10 @@ public partial class RPFTripNeededSystem : GameSystemBase
         public RandomSeed m_RandomSeed;
         [ReadOnly]
         public float m_TimeOfDay;
+        [ReadOnly]
+        public uint m_SimulationFrame;
+        [ReadOnly]
+        public TripPriorityParametersData m_TripPriorityParameters;
         [ReadOnly]
         public EntityArchetype m_ResetTripArchetype;
         [ReadOnly]
@@ -1739,6 +1759,10 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                         Household household2 = this.m_Households[household1];
                                         // ISSUE: reference to a compiler-generated field
                                         DynamicBuffer<HouseholdCitizen> householdCitizen = this.m_HouseholdCitizens[household1];
+                                        byte priority = this.m_TripPriorityParameters.GetPriority(trips[0].m_Purpose, citizen);
+                                        TripNeeded prioritizedTrip = trips[0];
+                                        prioritizedTrip.m_Priority = priority;
+                                        trips[0] = prioritizedTrip;
                                         pathfindParameters = new PathfindParameters();
                                         pathfindParameters.m_MaxSpeed = (float2)277.777771f;
                                         pathfindParameters.m_WalkSpeed = (float2)humanData.m_WalkSpeed;
@@ -1747,8 +1771,7 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                         pathfindParameters.m_Methods = PathMethod.Pedestrian | PathMethod.Taxi | RouteUtils.GetPublicTransportMethods(this.m_TimeOfDay);
                                         pathfindParameters.m_TaxiIgnoredRules = VehicleUtils.GetIgnoredPathfindRulesTaxiDefaults();
                                         // ISSUE: reference to a compiler-generated field
-                                        // ISSUE: reference to a compiler-generated field
-                                        pathfindParameters.m_MaxCost = math.select(CitizenBehaviorSystem.kMaxPathfindCost, CitizenBehaviorSystem.kMaxMovingAwayCost, test);
+                                        pathfindParameters.m_MaxCost = this.m_TripPriorityParameters.GetMaxCost(priority);
                                         PathfindParameters parameters = pathfindParameters;
                                         setupQueueTarget = new SetupQueueTarget();
                                         setupQueueTarget.m_Type = SetupTargetType.CurrentLocation;
@@ -1801,7 +1824,11 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                                 Game.Vehicles.PersonalCar componentData5;
                                                 // ISSUE: reference to a compiler-generated field
                                                 if (this.m_PersonalCarData.TryGetComponent(car, out componentData5) && (componentData5.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
+                                                {
                                                     parameters.m_PathfindFlags |= PathfindFlags.ParkingReset;
+                                                    if (parameters.m_Authorization1 != Entity.Null && parameters.m_Authorization1 == target.m_Target)
+                                                        parameters.m_Methods &= ~(PathMethod.Taxi | RouteUtils.GetPublicTransportMethods(this.m_TimeOfDay));
+                                                }
                                             }
                                         }
                                         else
@@ -2057,6 +2084,17 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                             Game.Citizens.Purpose divertPurpose = Game.Citizens.Purpose.None;
                                             bool pathFailed = !isCarried && dynamicBuffer.Length == 0;
                                             bool hasDivertPath = false;
+                                            if (pathFailed && tripNeeded.m_Purpose == Game.Citizens.Purpose.Leisure)
+                                            {
+                                                LeisureSeekerCooldown cooldown = new LeisureSeekerCooldown()
+                                                {
+                                                    m_SimulationFrame = this.m_SimulationFrame
+                                                };
+                                                if (this.m_LeisureSeekerCooldowns.HasComponent(entity1))
+                                                    this.m_CommandBuffer.SetComponent<LeisureSeekerCooldown>(unfilteredChunkIndex, entity1, cooldown);
+                                                else
+                                                    this.m_CommandBuffer.AddComponent<LeisureSeekerCooldown>(unfilteredChunkIndex, entity1, cooldown);
+                                            }
                                             // ISSUE: reference to a compiler-generated method
                                             this.GetResidentFlags(entity1, currentBuilding2, isMailSender, pathFailed, ref target, ref tripNeeded.m_Purpose, ref divertPurpose, ref timer, ref hasDivertPath);
                                             UnderConstruction componentData12;
@@ -2178,6 +2216,10 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                         Household household3 = this.m_Households[household1];
                                         // ISSUE: reference to a compiler-generated field
                                         DynamicBuffer<HouseholdCitizen> householdCitizen = this.m_HouseholdCitizens[household1];
+                                        byte priority = this.m_TripPriorityParameters.GetPriority(trips[0].m_Purpose, citizen);
+                                        TripNeeded prioritizedTrip = trips[0];
+                                        prioritizedTrip.m_Priority = priority;
+                                        trips[0] = prioritizedTrip;
                                         pathfindParameters = new PathfindParameters();
                                         pathfindParameters.m_MaxSpeed = (float2)277.777771f;
                                         pathfindParameters.m_WalkSpeed = (float2)humanData.m_WalkSpeed;
@@ -2186,7 +2228,7 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                         pathfindParameters.m_Methods = PathMethod.Pedestrian | PathMethod.Taxi | RouteUtils.GetPublicTransportMethods(this.m_TimeOfDay);
                                         pathfindParameters.m_TaxiIgnoredRules = VehicleUtils.GetIgnoredPathfindRulesTaxiDefaults();
                                         // ISSUE: reference to a compiler-generated field
-                                        pathfindParameters.m_MaxCost = CitizenBehaviorSystem.kMaxPathfindCost;
+                                        pathfindParameters.m_MaxCost = this.m_TripPriorityParameters.GetMaxCost(priority);
                                         PathfindParameters parameters = pathfindParameters;
                                         setupQueueTarget = new SetupQueueTarget();
                                         setupQueueTarget.m_Type = SetupTargetType.CurrentLocation;
@@ -2283,7 +2325,9 @@ public partial class RPFTripNeededSystem : GameSystemBase
                                                 Game.Vehicles.PersonalCar componentData14;
                                                 // ISSUE: reference to a compiler-generated field
                                                 if (this.m_PersonalCarData.TryGetComponent(car, out componentData14) && (componentData14.m_State & PersonalCarFlags.HomeTarget) == (PersonalCarFlags)0)
+                                                {
                                                     parameters.m_PathfindFlags |= PathfindFlags.ParkingReset;
+                                                }
                                             }
                                         }
                                         else
@@ -2448,6 +2492,8 @@ public partial class RPFTripNeededSystem : GameSystemBase
         [ReadOnly]
         public ComponentLookup<Criminal> __Game_Citizens_Criminal_RO_ComponentLookup;
         [ReadOnly]
+        public ComponentLookup<LeisureSeekerCooldown> __Game_Citizens_LeisureSeekerCooldown_RO_ComponentLookup;
+        [ReadOnly]
         public ComponentLookup<CurrentBuilding> __Game_Citizens_CurrentBuilding_RO_ComponentLookup;
         public ComponentLookup<CitizenPresence> __Game_Buildings_CitizenPresence_RW_ComponentLookup;
         [ReadOnly]
@@ -2555,6 +2601,8 @@ public partial class RPFTripNeededSystem : GameSystemBase
             this.__Game_Citizens_HouseholdCitizen_RO_BufferLookup = state.GetBufferLookup<HouseholdCitizen>(true);
             // ISSUE: reference to a compiler-generated field
             this.__Game_Citizens_Criminal_RO_ComponentLookup = state.GetComponentLookup<Criminal>(true);
+            // ISSUE: reference to a compiler-generated field
+            this.__Game_Citizens_LeisureSeekerCooldown_RO_ComponentLookup = state.GetComponentLookup<LeisureSeekerCooldown>(true);
             // ISSUE: reference to a compiler-generated field
             this.__Game_Citizens_CurrentBuilding_RO_ComponentLookup = state.GetComponentLookup<CurrentBuilding>(true);
             // ISSUE: reference to a compiler-generated field

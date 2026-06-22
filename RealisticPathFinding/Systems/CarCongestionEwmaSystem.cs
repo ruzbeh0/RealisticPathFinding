@@ -116,6 +116,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             _carLaneLk = GetComponentLookup<CarCurrentLane>(true);
             _curveLk = GetComponentLookup<Curve>(true);
             _prefabLk = GetComponentLookup<PrefabRef>(true);

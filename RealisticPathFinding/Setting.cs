@@ -14,8 +14,8 @@ using Unity.Entities;
 namespace RealisticPathFinding
 {
     [FileLocation("ModsSettings\\" + nameof(RealisticPathFinding) + "\\" + nameof(RealisticPathFinding))]
-    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, BicycleGroup, TaxiGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup, OtherGroup)]
-    [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup)]
+    [SettingsUIGroupOrder(CarModeWeightGroup, TurnPenaltyGroup, AdvancedTurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, BicycleGroup, TaxiGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup, OtherGroup)]
+    [SettingsUIShowGroupName(CarModeWeightGroup, TurnPenaltyGroup, AdvancedTurnPenaltyGroup, RoadBiasGroup, CongestionGroup, WaitingTimeGroup, ModeWeightGroup, BusLaneGroup, PedestrianGroup, LongDistanceGroup, PedestrianCrossingGroup)]
     public class Setting : ModSetting
     {
         public const string PedestriansSection = "Pedestrians";
@@ -32,6 +32,7 @@ namespace RealisticPathFinding
         public const string LongDistanceGroup = "LongDistanceGroup";
         public const string PedestrianCrossingGroup = "PedestrianCrossingGroup";
         public const string TurnPenaltyGroup = "TurnPenalty";
+        public const string AdvancedTurnPenaltyGroup = "AdvancedTurnPenalty";
         public const string RoadBiasGroup = "RoadBias";
         public const string CongestionGroup = "Congestion";
         public const string CarModeWeightGroup = "CarModeWeightGroup";
@@ -40,7 +41,7 @@ namespace RealisticPathFinding
 
         public Setting(IMod mod) : base(mod)
         {
-            if (transfer_penalty == 0) SetDefaults();
+            SetDefaults();
         }
 
         public override void SetDefaults()
@@ -50,6 +51,8 @@ namespace RealisticPathFinding
         public void SetParameters()
         {
             car_mode_weight = 0.90f;
+            game_turn_cost_multiplier = 0.5f;
+            game_uturn_cost_multiplier = 0.35f;
             base_turn_penalty = 2f;
             min_turn_agle_deg = 45f;
             max_turn_agle_deg = 100f;
@@ -57,7 +60,7 @@ namespace RealisticPathFinding
             collector_bias = 0.05f;
             local_bias = 0.1f;
             alleyway_bias = 0.15f;
-            uturn_sec_penalty = 4f;
+            uturn_sec_penalty = 0f;
             transfer_penalty = 1.5f;
             feeder_trunk_transfer_penalty = 1.2f;
             waiting_time_factor = 1.0f;
@@ -117,12 +120,20 @@ namespace RealisticPathFinding
         [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
         public float base_turn_penalty { get; set; }
 
-        [SettingsUISlider(min = 0, max = 180, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISlider(min = 0.05f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
+        public float game_turn_cost_multiplier { get; set; }
+
+        [SettingsUISlider(min = 0.05f, max = 2f, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
+        public float game_uturn_cost_multiplier { get; set; }
+
+        [SettingsUISlider(min = 0, max = 180, step = 5f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISection(VehicleSection, AdvancedTurnPenaltyGroup)]
         public float uturn_threshold_deg { get; set; }
 
-        [SettingsUISlider(min = 0, max = 500, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
-        [SettingsUISection(VehicleSection, TurnPenaltyGroup)]
+        [SettingsUISlider(min = 0, max = 100, step = 1f, scalarMultiplier = 1, unit = Unit.kFloatSingleFraction)]
+        [SettingsUISection(VehicleSection, AdvancedTurnPenaltyGroup)]
         public float uturn_sec_penalty { get; set; }
 
         [SettingsUISlider(min = 0, max = 1, step = 0.05f, scalarMultiplier = 1, unit = Unit.kFloatTwoFractions)]
@@ -317,6 +328,7 @@ namespace RealisticPathFinding
             set
             {
                 SetDefaults();
+                ApplyAndSave();
             }
 
         }
@@ -355,6 +367,7 @@ namespace RealisticPathFinding
 
             // New groups inside the Vehicles section
             { m_Setting.GetOptionGroupLocaleID(Setting.TurnPenaltyGroup), "Turn penalties" },
+            { m_Setting.GetOptionGroupLocaleID(Setting.AdvancedTurnPenaltyGroup), "Advanced turn penalties" },
             { m_Setting.GetOptionGroupLocaleID(Setting.RoadBiasGroup),    "Road hierarchy bias" },
             { m_Setting.GetOptionGroupLocaleID(Setting.BusLaneGroup),    "Bus Lanes" },
 
@@ -494,11 +507,17 @@ namespace RealisticPathFinding
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.base_turn_penalty)), "Base turn penalty (seconds)" },
             { m_Setting.GetOptionDescLocaleID(nameof(Setting.base_turn_penalty)), "Maximum seconds added for a sharp turn (reached at or above the max angle, zero at/below the min angle)." },
 
-            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.uturn_threshold_deg)), "U-turn threshold (deg)" },
-            { m_Setting.GetOptionDescLocaleID(nameof(Setting.uturn_threshold_deg)), "If the computed turn angle is at/above this value, the U-turn extra penalty is added." },
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.game_turn_cost_multiplier)), "Game turn cost multiplier" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.game_turn_cost_multiplier)), "Scales the game's built-in turn and curve-angle costs. Lower values make sharp turns less avoided; 1.0 keeps the game value." },
 
-            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.uturn_sec_penalty)), "U-turn extra penalty (seconds)" },
-            { m_Setting.GetOptionDescLocaleID(nameof(Setting.uturn_sec_penalty)), "Additional seconds applied when the turn angle exceeds the U-turn threshold." },
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.game_uturn_cost_multiplier)), "Game U-turn cost multiplier" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.game_uturn_cost_multiplier)), "Scales the game's built-in U-turn and unsafe U-turn costs. Lower values make U-turns more available; 1.0 keeps the game value." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.uturn_threshold_deg)), "Additional U-turn threshold (deg)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.uturn_threshold_deg)), "Used only by RPF's extra angle-based U-turn penalty." },
+
+            { m_Setting.GetOptionLabelLocaleID(nameof(Setting.uturn_sec_penalty)), "Additional RPF U-turn penalty (seconds)" },
+            { m_Setting.GetOptionDescLocaleID(nameof(Setting.uturn_sec_penalty)), "Extra seconds layered on top of the game U-turn multiplier when the angle exceeds the threshold. 0 = off." },
 
             // Road hierarchy bias
             { m_Setting.GetOptionLabelLocaleID(nameof(Setting.collector_bias)), "Collector bias (density add)" },

@@ -39,6 +39,9 @@ namespace RealisticPathFinding.Systems
 
         protected override void OnUpdate()
         {
+            if (SimulationGuard.IsGameLoading())
+                return;
+
             var em = EntityManager;
             var s = Mod.m_Setting;
             int thr = (int)(s?.taxi_passengers_waiting_threashold ?? 7f);
